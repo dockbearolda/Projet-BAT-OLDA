@@ -6,7 +6,6 @@ import { buildBatPdf, formatBatFilename } from "./pdf/buildPdf";
 import {
   defaultFaceState,
   type ColorVariant,
-  type Face,
   type FaceState,
   type Manifest,
   type RefEntry,
