@@ -1,0 +1,14 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+html, body, #root {
+  height: 100%;
+}
+
+/* Touch-friendly target on tablet (Galaxy Tab A9+ 11") */
+@media (pointer: coarse) {
+  button, [role="button"], select, input {
+    min-height: 44px;
+  }
+}
