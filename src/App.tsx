@@ -255,7 +255,7 @@ export default function App() {
       <footer className="border-t border-slate-200 bg-white px-6 py-3">
         <p className="mx-auto max-w-[1400px] text-center text-xs text-slate-500">
           Clique sur un t-shirt pour ajouter le logo. Glisse et redimensionne directement dessus (lignes rouges = centre).
-          Le client valide en cochant <span className="font-semibold text-ink">OUI / NON</span> dans le PDF, ou répond simplement <span className="font-semibold text-ink">OK</span> sur WhatsApp.
+          Génère le PDF, envoie-le au client — il valide d'un simple <span className="font-semibold text-ink">OK</span> sur WhatsApp.
         </p>
       </footer>
 
