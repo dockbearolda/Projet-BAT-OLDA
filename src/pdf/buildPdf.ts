@@ -10,8 +10,11 @@ import { embedAppFonts } from "./fonts";
 import { loadOldaLogo } from "./rasterizeSvg";
 
 export interface BatPdfView {
-  label: string;        // "AVANT" | "ARRIÈRE"
+  label: string;        // "AVANT" | "ARRIÈRE" | "CÔTÉ GAUCHE"…
   composedPng: Blob;    // mockup + logo déjà composés (cf compose.ts)
+  /** Si défini, rogne l'image au centre à cette fraction de largeur (profils
+   *  étroits) → cadre plus fin, t-shirt à la même hauteur que l'avant/arrière. */
+  cropXFraction?: number;
 }
 
 export interface BatPdfInput {
@@ -19,7 +22,7 @@ export interface BatPdfInput {
   date: Date;
   refLabel: string;     // ex. "H-001 NS300"
   colorLabel: string;   // ex. "Marine"
-  views: BatPdfView[];  // [avant, arrière]
+  views: BatPdfView[];  // [avant, arrière, côté gauche, côté droit]
 }
 
 // ─── A4 paysage : 2 visuels côte à côte, grands ─────────────────────────
@@ -90,12 +93,25 @@ function dashOr(value: string | undefined | null): string {
   return String(value).trim();
 }
 
-/** Optimise un PNG composé en JPEG (≤1600 px, q=0.85) — léger pour WhatsApp. */
-async function optimizeMockupImage(png: Blob, maxDim = 1600, quality = 0.85): Promise<Uint8Array> {
+/** Optimise un PNG composé en JPEG (≤1600 px, q=0.85) — léger pour WhatsApp.
+ *  `cropXFraction` rogne au centre à cette fraction de largeur (vues de côté :
+ *  on retire le blanc latéral pour une image étroite). */
+async function optimizeMockupImage(
+  png: Blob,
+  maxDim = 1600,
+  quality = 0.85,
+  cropXFraction?: number,
+): Promise<Uint8Array> {
   const bitmap = await createImageBitmap(png);
-  const scale = Math.min(1, maxDim / Math.max(bitmap.width, bitmap.height));
-  const w = Math.round(bitmap.width * scale);
-  const h = Math.round(bitmap.height * scale);
+  const cropW =
+    cropXFraction && cropXFraction > 0 && cropXFraction < 1
+      ? Math.round(bitmap.width * cropXFraction)
+      : bitmap.width;
+  const cropX = Math.round((bitmap.width - cropW) / 2);
+  const cropH = bitmap.height;
+  const scale = Math.min(1, maxDim / Math.max(cropW, cropH));
+  const w = Math.round(cropW * scale);
+  const h = Math.round(cropH * scale);
   const canvas = document.createElement("canvas");
   canvas.width = w;
   canvas.height = h;
@@ -103,7 +119,7 @@ async function optimizeMockupImage(png: Blob, maxDim = 1600, quality = 0.85): Pr
   if (!ctx) throw new Error("Canvas 2D indisponible");
   ctx.fillStyle = "#FFFFFF";
   ctx.fillRect(0, 0, w, h);
-  ctx.drawImage(bitmap, 0, 0, w, h);
+  ctx.drawImage(bitmap, cropX, 0, cropW, cropH, 0, 0, w, h);
   bitmap.close?.();
   const blob: Blob | null = await new Promise((resolve) =>
     canvas.toBlob(resolve, "image/jpeg", quality),
@@ -218,7 +234,7 @@ function drawClientBlock(ctx: Ctx, input: BatPdfInput, topY: number): void {
   });
 }
 
-// ─── VISUELS : 1 ou 2 vues côte à côte, plein cadre ─────────────────────
+// ─── VISUELS : N vues côte à côte, t-shirts à la MÊME hauteur ────────────
 interface OptimizedView {
   view: BatPdfView;
   img: PDFImage;
@@ -231,40 +247,49 @@ function drawVisuals(ctx: Ctx, views: OptimizedView[], topY: number, bottomY: nu
   const frameBottom = bottomY;
   const frameH = frameTop - frameBottom;
   const colGap = 16;
-  const slotW = (fullW - colGap * (views.length - 1)) / views.length;
+  const innerPad = 14;
+
+  // Chaque image (déjà rognée à l'embarquement pour les profils) est rendue à
+  // la MÊME hauteur → t-shirts à hauteur identique. La largeur d'un cadre suit
+  // l'aspect de son image : les vues de côté (rognées étroites) sont plus
+  // fines. On dimensionne la hauteur commune pour que l'ensemble tienne en
+  // largeur, puis on centre le groupe.
+  const aspects = views.map(({ img }) => img.width / img.height);
+  const sumAspect = aspects.reduce((a, b) => a + b, 0);
+  const gaps = colGap * (views.length - 1);
+  const padW = views.length * innerPad * 2;
+  const imgHByWidth = (fullW - gaps - padW) / sumAspect;
+  const imgH = Math.min(frameH - innerPad * 2, imgHByWidth);
+
+  const frameWidths = aspects.map((a) => imgH * a + innerPad * 2);
+  const totalW = frameWidths.reduce((a, b) => a + b, 0) + gaps;
+  let cursorX = MARGIN + (fullW - totalW) / 2; // centré horizontalement
+
+  // Bloc centré verticalement dans la zone disponible.
+  const frameInnerH = imgH + innerPad * 2;
+  const blockTop = frameTop - Math.max(0, (frameH - frameInnerH) / 2);
 
   views.forEach(({ view, img }, idx) => {
-    const slotX = MARGIN + idx * (slotW + colGap);
+    const fw = frameWidths[idx];
+    const slotX = cursorX;
+    const slotBottom = blockTop - frameInnerH;
 
-    // Cadre
+    // Cadre (hauteur identique pour tous)
     ctx.page.drawRectangle({
       x: slotX,
-      y: frameBottom,
-      width: slotW,
-      height: frameH,
+      y: slotBottom,
+      width: fw,
+      height: frameInnerH,
       color: FRAME_BG,
       borderColor: BORDER,
       borderWidth: 0.5,
     });
 
-    // Image fittée (préserve l'aspect)
-    const innerPad = 14;
-    const imgArea = {
-      x: slotX + innerPad,
-      y: frameBottom + innerPad,
-      w: slotW - innerPad * 2,
-      h: frameH - innerPad * 2,
-    };
-    const aspect = img.width / img.height;
-    let w = imgArea.w;
-    let h = w / aspect;
-    if (h > imgArea.h) {
-      h = imgArea.h;
-      w = h * aspect;
-    }
-    const imgX = imgArea.x + (imgArea.w - w) / 2;
-    const imgY = imgArea.y + (imgArea.h - h) / 2;
-    ctx.page.drawImage(img, { x: imgX, y: imgY, width: w, height: h });
+    // Image centrée, hauteur = imgH pour toutes les vues
+    const w = imgH * (img.width / img.height);
+    const imgX = slotX + (fw - w) / 2;
+    const imgY = slotBottom + innerPad;
+    ctx.page.drawImage(img, { x: imgX, y: imgY, width: w, height: imgH });
 
     // Tag noir en haut-gauche
     const tagText = view.label.toUpperCase();
@@ -273,7 +298,7 @@ function drawVisuals(ctx: Ctx, views: OptimizedView[], topY: number, bottomY: nu
     const tagW = tagTextW + 16;
     const tagH = 16;
     const tagX = slotX + 10;
-    const tagY = frameTop - tagH - 10;
+    const tagY = blockTop - tagH - 10;
     ctx.page.drawRectangle({ x: tagX, y: tagY, width: tagW, height: tagH, color: TEXT });
     drawText(ctx, tagText, {
       x: tagX + 8,
@@ -283,6 +308,8 @@ function drawVisuals(ctx: Ctx, views: OptimizedView[], topY: number, bottomY: nu
       color: WHITE,
       tracking: 1.5,
     });
+
+    cursorX += fw + colGap;
   });
 }
 
@@ -326,7 +353,7 @@ export async function buildBatPdf(input: BatPdfInput): Promise<Blob> {
     loadOldaLogo(),
     Promise.all(
       input.views.map(async (v) => {
-        const bytes = await optimizeMockupImage(v.composedPng);
+        const bytes = await optimizeMockupImage(v.composedPng, 1600, 0.85, v.cropXFraction);
         return { view: v, img: await pdf.embedJpg(bytes) } satisfies OptimizedView;
       }),
     ),

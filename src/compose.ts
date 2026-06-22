@@ -18,6 +18,7 @@ export async function composeFacePng(
   mockupUrl: string,
   face: FaceState,
   targetWidth = 2000,
+  mirror = false,
 ): Promise<Blob> {
   const mock = await loadImage(mockupUrl);
   const c = document.createElement("canvas");
@@ -25,7 +26,16 @@ export async function composeFacePng(
   c.height = Math.round(targetWidth * (mock.naturalHeight / mock.naturalWidth));
   const ctx = c.getContext("2d");
   if (!ctx) throw new Error("canvas 2D indisponible");
-  ctx.drawImage(mock, 0, 0, c.width, c.height);
+  // Le mockup peut être miroité (vue droite) ; le logo, lui, jamais.
+  if (mirror) {
+    ctx.save();
+    ctx.translate(c.width, 0);
+    ctx.scale(-1, 1);
+    ctx.drawImage(mock, 0, 0, c.width, c.height);
+    ctx.restore();
+  } else {
+    ctx.drawImage(mock, 0, 0, c.width, c.height);
+  }
 
   if (face.logo) {
     const logo = await loadImage(face.logoTintedUrl ?? face.logo.dataUrl);
