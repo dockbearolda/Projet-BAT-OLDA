@@ -32,22 +32,26 @@ export interface BatPdfInput {
   refSupplier: string;  // ex. "NS300"
   refLabel: string;     // ex. "H-001 NS300" (titre / nom de fichier)
   sleeveType: SleeveType;
+  technique: string;    // technique de marquage, ex. "DTF"
   colorLabel: string;   // ex. "Marine"
   colorHex: string;     // ex. "#14213D"
   views: BatPdfView[];  // [avant, arrière, côté gauche, côté droit]
 }
 
 // ─── Coordonnées de l'atelier (pied de page officiel) ───────────────────
-// À COMPLÉTER avec les vraies coordonnées. Tout champ laissé vide n'est PAS
-// imprimé (aucune donnée inventée sur un document officiel).
 const ATELIER = {
-  name: "Atelier OLDA",
-  tagline: "IMPRESSION TEXTILE PROFESSIONNELLE",
-  address: "",
-  phone: "",
-  email: "",
-  web: "",
-  siret: "",
+  name: "OLDA · Atelier",
+  legalName: "Atelier OLDA SARL",
+  tagline: "IMPRESSION TEXTILE DTF",
+  address: "1 rue Opale, Route de l'Espérance, 97150 Grand-Case, Saint-Martin",
+  phone: "+590 690 47 97 88",
+  phoneFixed: "05 90 77 13 04",
+  email: "atelierolda@gmail.com",
+  hours: "Lun–Ven · 9h–18h",
+  siret: "978 296 952 00028",
+  tva: "FR86978296952",
+  ape: "1813Z",
+  rcs: "RCS Saint-Martin",
 };
 
 // ─── A4 paysage : 2 visuels côte à côte, grands ─────────────────────────
@@ -60,17 +64,18 @@ const SPECS_H = 50;
 const GAP = 12;
 
 // Bande basse : mentions légales + bon pour accord, posée au-dessus du pied.
-const FOOTER_H = 22;       // hauteur du pied de page (coordonnées atelier)
+const FOOTER_H = 30;       // pied de page (coordonnées + infos légales, 2 lignes)
 const BAND_H = 116;        // mentions + signature
 const BAND_BOTTOM = MARGIN + FOOTER_H;
 
-// ─── Palette Atelier OLDA ───────────────────────────────────────────────
-const TEXT       = rgb(0.102, 0.102, 0.102);
+// ─── Palette Atelier OLDA (design system : encre froide + canard) ───────
+const TEXT       = rgb(0.125, 0.161, 0.188); // #202930 encre froide
+const DUCK       = rgb(0.290, 0.384, 0.455); // #4A6274 accent canard
 const WHITE      = rgb(1, 1, 1);
-const GRAY_LIGHT = rgb(0.957, 0.957, 0.957);
+const GRAY_LIGHT = rgb(0.945, 0.957, 0.961); // bandeau specs
 const FRAME_BG   = rgb(0.980, 0.980, 0.980);
-const BORDER     = rgb(0.878, 0.878, 0.878);
-const MUTED      = rgb(0.541, 0.541, 0.541);
+const BORDER     = rgb(0.855, 0.878, 0.890);
+const MUTED      = rgb(0.357, 0.420, 0.471); // #5B6B78
 
 const SLEEVE_LABEL: Record<SleeveType, string> = {
   short: "Manche courte",
@@ -269,11 +274,11 @@ function drawHeader(ctx: Ctx, input: BatPdfInput, logoImg: PDFImage, bat: string
     y: bottom,
     width: PAGE_W - MARGIN * 2,
     height: 1.2,
-    color: TEXT,
+    color: DUCK,
   });
 }
 
-// ─── SPECS : client + famille + référence + manche + coloris ────────────
+// ─── SPECS : client + famille + référence + manche + technique + coloris ─
 function drawSpecs(ctx: Ctx, input: BatPdfInput, topY: number): void {
   const bottom = topY - SPECS_H;
   const fullW = PAGE_W - MARGIN * 2;
@@ -296,6 +301,7 @@ function drawSpecs(ctx: Ctx, input: BatPdfInput, topY: number): void {
     { label: "FAMILLE", value: categoryLabel(input.category) },
     { label: "RÉFÉRENCE", value: refValue },
     { label: "MANCHE", value: SLEEVE_LABEL[input.sleeveType] ?? "—" },
+    { label: "TECHNIQUE", value: input.technique },
     { label: "COLORIS", value: input.colorLabel, swatch: input.colorHex },
   ];
 
@@ -339,8 +345,8 @@ function drawSpecs(ctx: Ctx, input: BatPdfInput, topY: number): void {
     }
     drawText(ctx, dashOr(c.value), {
       x: valueX,
-      y: topY - 35,
-      size: 13,
+      y: topY - 34,
+      size: 12,
       bold: true,
       color: TEXT,
       maxWidth: valueMax,
@@ -427,7 +433,7 @@ function drawVisuals(ctx: Ctx, views: OptimizedView[], topY: number, bottomY: nu
     const tagH = 16;
     const tagX = slotX + 10;
     const tagY = blockTop - tagH - 10;
-    ctx.page.drawRectangle({ x: tagX, y: tagY, width: tagW, height: tagH, color: TEXT });
+    ctx.page.drawRectangle({ x: tagX, y: tagY, width: tagW, height: tagH, color: DUCK });
     drawText(ctx, tagText, {
       x: tagX + 8,
       y: tagY + 5,
@@ -490,7 +496,7 @@ function drawApprovalBand(ctx: Ctx): void {
     y: top - barH,
     width: rightW,
     height: barH,
-    color: TEXT,
+    color: DUCK,
   });
   drawText(ctx, "BON POUR ACCORD", {
     x: rightX + 10,
@@ -565,9 +571,8 @@ function drawApprovalBand(ctx: Ctx): void {
   });
 }
 
-// ─── PIED DE PAGE : coordonnées atelier + n° BAT + génération ───────────
+// ─── PIED DE PAGE : coordonnées + infos légales + n° BAT (2 lignes) ─────
 function drawFooter(ctx: Ctx, input: BatPdfInput, bat: string): void {
-  const y = MARGIN + 6;
   ctx.page.drawRectangle({
     x: MARGIN,
     y: MARGIN + FOOTER_H,
@@ -576,22 +581,37 @@ function drawFooter(ctx: Ctx, input: BatPdfInput, bat: string): void {
     color: BORDER,
   });
 
-  const coords = [
-    ATELIER.address,
-    ATELIER.phone,
-    ATELIER.email,
-    ATELIER.web,
-    ATELIER.siret ? `SIRET ${ATELIER.siret}` : "",
-  ].filter((s) => s && s.trim());
-  const left = [ATELIER.name, ...coords].join("  ·  ");
-  drawText(ctx, left, { x: MARGIN, y, size: 6.5, color: MUTED, maxWidth: PAGE_W * 0.6 });
+  const y1 = MARGIN + 18;
+  const y2 = MARGIN + 8;
+  const size = 6.5;
 
+  // Ligne 1 : raison sociale · adresse · horaires
+  const line1 = [ATELIER.legalName, ATELIER.address, ATELIER.hours]
+    .filter((s) => s && s.trim())
+    .join("  ·  ");
+  drawText(ctx, line1, { x: MARGIN, y: y1, size, color: MUTED, maxWidth: PAGE_W - MARGIN * 2 });
+
+  // Ligne 2 : contact + identifiants légaux
+  const line2 = [
+    `Tél ${ATELIER.phone}`,
+    ATELIER.email,
+    `SIRET ${ATELIER.siret}`,
+    `TVA ${ATELIER.tva}`,
+    `APE ${ATELIER.ape}`,
+    ATELIER.rcs,
+  ]
+    .filter((s) => s && s.trim())
+    .join("  ·  ");
+  drawText(ctx, line2, { x: MARGIN, y: y2, size, color: MUTED, maxWidth: PAGE_W - MARGIN * 2 });
+
+  // n° BAT + génération (aligné à droite, ligne haute)
   const right = `BAT N° ${bat}  ·  Généré le ${formatDateFr(input.date)}  ·  Page 1/1`;
   drawText(ctx, right, {
-    x: PAGE_W - MARGIN - widthOf(ctx.font, right, 6.5),
-    y,
-    size: 6.5,
-    color: MUTED,
+    x: PAGE_W - MARGIN - widthOf(ctx.fontBold, right, size),
+    y: y1,
+    size,
+    bold: true,
+    color: TEXT,
   });
 }
 
