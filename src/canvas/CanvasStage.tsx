@@ -321,12 +321,56 @@ export function CanvasStage({
   // sinon valeurs validées de l'état.
   const disp = live ?? { xPct: state.posXPct, yPct: state.posYPct, sizePct: state.sizePct };
 
+  // Pastilles « couleur du logo » (logo monochrome) — rangée compacte placée
+  // dans la barre du libellé (à côté de Avant/Arrière). Défile horizontalement
+  // si la largeur manque → la barre reste sur UNE ligne, donc les bulles
+  // gardent la même taille partout.
+  const paletteDots = (
+    <div className="flex min-w-0 flex-1 items-center gap-1 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
+      {LOGO_PALETTE.map(({ name, hex }) => {
+        const sel = state.logoTint?.toUpperCase() === hex.toUpperCase();
+        return (
+          <button
+            key={hex}
+            type="button"
+            onClick={() => applyTint(hex)}
+            title={name}
+            className={`flex h-6 w-6 min-h-0 flex-shrink-0 items-center justify-center rounded-full transition hover:scale-110 ${
+              isLight(hex) ? "border border-duck/25" : ""
+            } ${sel ? "ring-2 ring-duck-focus ring-offset-1" : ""}`}
+            style={{ backgroundColor: hex }}
+          >
+            {sel && <Check className={`h-3 w-3 ${isLight(hex) ? "text-ink" : "text-white"}`} />}
+          </button>
+        );
+      })}
+      <button
+        type="button"
+        onClick={() => applyTint(null)}
+        title="Couleur d'origine du logo"
+        className={`ml-0.5 flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+          state.logoTint === null ? "bg-duck/10 text-ink" : "text-muted2 hover:text-ink"
+        }`}
+      >
+        Orig.
+      </button>
+      <input
+        type="color"
+        value={state.logoTint ?? "#000000"}
+        onChange={(e) => applyTint(e.target.value.toUpperCase())}
+        title="Couleur personnalisée"
+        className="h-6 w-6 min-h-0 flex-shrink-0 cursor-pointer rounded border border-duck/15 bg-white"
+      />
+    </div>
+  );
+
   return (
     <div className="relative flex h-full w-full min-h-0 flex-col">
-      <div className="mb-2 flex items-center justify-between gap-2 px-1">
-        <span className="min-w-0 truncate text-xs font-semibold uppercase tracking-wider text-muted">
+      <div className="mb-2 flex min-h-[30px] items-center justify-between gap-2 px-1">
+        <span className="flex-shrink-0 truncate text-xs font-semibold uppercase tracking-wider text-muted">
           {label}
         </span>
+        {state.logo?.isMonochrome && paletteDots}
         {hasLogo && (
           <div className="flex flex-shrink-0 items-center gap-1.5">
             <button
@@ -476,10 +520,10 @@ export function CanvasStage({
           </Stage>
         ) : null}
 
-        {/* Bandeau live : position + taille du logo. En haut-gauche pour ne
-            jamais chevaucher l'overlay « couleur du logo » (bas de bulle). */}
+        {/* Bandeau live : position + taille du logo. En bas-gauche pour ne
+            jamais chevaucher l'overlay « couleur du logo » (haut de bulle). */}
         {hasLogo && stageSize.width > 0 && (
-          <div className="pointer-events-none absolute top-2 left-2 rounded-md bg-ink/85 px-2 py-1 text-[10px] font-medium tabular-nums text-white shadow-sm">
+          <div className="pointer-events-none absolute bottom-2 left-2 rounded-md bg-ink/85 px-2 py-1 text-[10px] font-medium tabular-nums text-white shadow-sm">
             X {Math.round(disp.xPct)}%  ·  Y {Math.round(disp.yPct)}%  ·  L {Math.round(disp.sizePct)}%
           </div>
         )}
@@ -497,60 +541,6 @@ export function CanvasStage({
         />
       </div>
 
-      {/* Bandeau « couleur du logo » (logo monochrome). En mode paysage
-          (fitHeight) il FLOTTE au-dessus du bas de la bulle → il ne consomme
-          pas la hauteur du canvas, les bulles gardent la même taille partout.
-          Sinon (mobile / 4 vues) il est en flux sous la bulle. */}
-      {state.logo?.isMonochrome && (
-        <div className={fitHeight ? "absolute inset-x-2 bottom-2 z-20" : "mt-3"}>
-          <div className="olda-glass rounded-xl p-2.5">
-            <div className="mb-1.5 flex items-center justify-between px-0.5">
-              <span className="text-[10px] font-bold uppercase tracking-widest text-muted2">
-                Couleur du logo
-              </span>
-              <div className="flex items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => applyTint(null)}
-                  className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition ${
-                    state.logoTint === null ? "bg-duck/10 text-ink" : "text-muted2 hover:text-ink"
-                  }`}
-                >
-                  Original
-                </button>
-                <input
-                  type="color"
-                  value={state.logoTint ?? "#000000"}
-                  onChange={(e) => applyTint(e.target.value.toUpperCase())}
-                  title="Couleur personnalisée"
-                  className="h-6 w-7 cursor-pointer rounded border border-duck/15 bg-white"
-                />
-              </div>
-            </div>
-            <div className="flex flex-wrap justify-center gap-2">
-              {LOGO_PALETTE.map(({ name, hex }) => {
-              const sel = state.logoTint?.toUpperCase() === hex.toUpperCase();
-              return (
-                <button
-                  key={hex}
-                  type="button"
-                  onClick={() => applyTint(hex)}
-                  title={name}
-                  className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full transition hover:scale-110 ${
-                    isLight(hex) ? "border border-duck/25" : ""
-                  } ${sel ? "ring-2 ring-duck-focus ring-offset-1" : ""}`}
-                  style={{ backgroundColor: hex }}
-                >
-                  {sel && (
-                    <Check className={`h-3.5 w-3.5 ${isLight(hex) ? "text-ink" : "text-white"}`} />
-                  )}
-                </button>
-              );
-            })}
-            </div>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
