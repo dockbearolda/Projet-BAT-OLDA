@@ -1,5 +1,5 @@
 import Konva from "konva";
-import { RotateCw, Trash2 } from "lucide-react";
+import { Check, RotateCw, Trash2 } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -8,8 +8,9 @@ import {
   useRef,
   useState,
 } from "react";
-import { Image as KonvaImage, Layer, Line, Stage, Transformer } from "react-konva";
+import { Circle, Group, Image as KonvaImage, Layer, Line, Stage, Transformer } from "react-konva";
 import { ingestLogo, IngestError } from "../ingest";
+import { LOGO_PALETTE, tintLogo } from "../logoColor";
 import type { Face, FaceState } from "../types";
 
 const SNAP_TOLERANCE = 4;
@@ -82,7 +83,7 @@ export interface CanvasStageProps {
   label: string;
   mockupUrl: string | null;
   state: FaceState;
-  onChange: (next: FaceState) => void;
+  onChange: (next: FaceState | ((prev: FaceState) => FaceState)) => void;
   onError?: (msg: string) => void;
 }
 
@@ -101,7 +102,7 @@ export function CanvasStage({
 
   const { width: boxW, height: boxH } = useContainerSize(containerRef);
   const mockupImg = useCachedImage(mockupUrl);
-  const logoImg = useCachedImage(state.logo?.dataUrl ?? null);
+  const logoImg = useCachedImage(state.logoTintedUrl ?? state.logo?.dataUrl ?? null);
 
   const mockupAspect = mockupImg ? mockupImg.naturalWidth / mockupImg.naturalHeight : 1;
 
@@ -127,6 +128,9 @@ export function CanvasStage({
   }, [stageSize, state, logoAspect]);
 
   const [snap, setSnap] = useState<{ v: boolean; h: boolean }>({ v: false, h: false });
+  // Pendant un drag/resize, on masque la croix de suppression (sa position est
+  // dérivée de l'état, qui ne se met à jour qu'en fin d'interaction).
+  const [interacting, setInteracting] = useState(false);
 
   useEffect(() => {
     const tr = transformerRef.current;
@@ -163,6 +167,7 @@ export function CanvasStage({
   const handleDragEnd = useCallback(
     (e: Konva.KonvaEventObject<DragEvent>) => {
       setSnap({ v: false, h: false });
+      setInteracting(false);
       if (!stageSize.width) return;
       const node = e.target;
       onChange({
@@ -175,6 +180,7 @@ export function CanvasStage({
   );
 
   const handleTransformEnd = useCallback(() => {
+    setInteracting(false);
     const node = logoRef.current;
     if (!node || !stageSize.width) return;
     const scaleX = node.scaleX();
@@ -197,11 +203,33 @@ export function CanvasStage({
   async function handleLogoFile(f: File) {
     try {
       const asset = await ingestLogo(f);
-      onChange({ ...state, logo: asset });
+      // updater fonctionnel : ne pas écraser une position/taille modifiée pendant l'await
+      onChange((prev) => ({ ...prev, logo: asset, logoTint: null, logoTintedUrl: null }));
     } catch (err) {
       const msg = err instanceof IngestError ? err.message : "Logo illisible";
       onError?.(msg);
     }
+  }
+
+  async function applyTint(hex: string | null) {
+    if (!state.logo) return;
+    if (hex === null) {
+      onChange((prev) => ({ ...prev, logoTint: null, logoTintedUrl: null }));
+      return;
+    }
+    try {
+      const url = await tintLogo(state.logo.dataUrl, hex);
+      // updater fonctionnel : un drag/resize pendant le calcul du tint n'est pas perdu
+      onChange((prev) => ({ ...prev, logoTint: hex, logoTintedUrl: url }));
+    } catch {
+      onError?.("Recoloration impossible");
+    }
+  }
+
+  function removeLogo() {
+    const container = logoRef.current?.getStage()?.container();
+    if (container) container.style.cursor = "default";
+    onChange((prev) => ({ ...prev, logo: null, logoTint: null, logoTintedUrl: null }));
   }
 
   const hasLogo = state.logo !== null;
@@ -226,7 +254,7 @@ export function CanvasStage({
             </button>
             <button
               type="button"
-              onClick={() => onChange({ ...state, logo: null })}
+              onClick={removeLogo}
               className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-slate-500 transition hover:bg-red-50 hover:text-accent"
               title="Retirer le logo"
             >
@@ -273,8 +301,10 @@ export function CanvasStage({
                   offsetX={logoPx.width / 2}
                   offsetY={logoPx.height / 2}
                   draggable
+                  onDragStart={() => setInteracting(true)}
                   onDragMove={handleDragMove}
                   onDragEnd={handleDragEnd}
+                  onTransformStart={() => setInteracting(true)}
                   onTransformEnd={handleTransformEnd}
                 />
               )}
@@ -282,7 +312,7 @@ export function CanvasStage({
                 ref={transformerRef}
                 rotateEnabled={false}
                 keepRatio
-                enabledAnchors={["top-left", "top-right", "bottom-left", "bottom-right"]}
+                enabledAnchors={["top-left", "bottom-left", "bottom-right"]}
                 boundBoxFunc={(oldBox, newBox) => {
                   const minPx = (MIN_LOGO_WIDTH_PCT / 100) * stageSize.width;
                   const maxPx = (MAX_LOGO_WIDTH_PCT / 100) * stageSize.width;
@@ -290,6 +320,41 @@ export function CanvasStage({
                   return newBox;
                 }}
               />
+
+              {/* Croix rouge de suppression, placée JUSTE EN DEHORS du coin
+                  haut-droit du logo : décalée en diagonale d'au moins r/√2 pour
+                  que sa zone tactile (r=20) ne chevauche jamais le corps du logo
+                  ni les poignées restantes, même à la taille minimale. */}
+              {logoImg && logoPx && !interacting && (
+                <Group
+                  x={clamp(logoPx.x + logoPx.width / 2 + 16, 14, stageSize.width - 14)}
+                  y={clamp(logoPx.y - logoPx.height / 2 - 16, 14, stageSize.height - 14)}
+                  onClick={removeLogo}
+                  onTap={removeLogo}
+                  onMouseEnter={(e) => {
+                    const c = e.target.getStage()?.container();
+                    if (c) c.style.cursor = "pointer";
+                  }}
+                  onMouseLeave={(e) => {
+                    const c = e.target.getStage()?.container();
+                    if (c) c.style.cursor = "default";
+                  }}
+                >
+                  {/* zone tactile (~40px) */}
+                  <Circle radius={20} fill="rgba(0,0,0,0.001)" />
+                  <Circle
+                    radius={12}
+                    fill="#E8001C"
+                    stroke="#FFFFFF"
+                    strokeWidth={2}
+                    shadowColor="#000000"
+                    shadowBlur={4}
+                    shadowOpacity={0.25}
+                  />
+                  <Line points={[-4.5, -4.5, 4.5, 4.5]} stroke="#FFFFFF" strokeWidth={2} lineCap="round" />
+                  <Line points={[-4.5, 4.5, 4.5, -4.5]} stroke="#FFFFFF" strokeWidth={2} lineCap="round" />
+                </Group>
+              )}
               {snap.v && (
                 <Line
                   points={[stageSize.width / 2, 0, stageSize.width / 2, stageSize.height]}
@@ -324,6 +389,66 @@ export function CanvasStage({
           }}
         />
       </div>
+
+      {/* Bandeau de couleurs sous le t-shirt : visible quand le logo est
+          monochrome (recolorable). Clic = recoloration immédiate. */}
+      {state.logo?.isMonochrome && (
+        <div className="mt-3">
+          <div className="mb-1.5 flex items-center justify-between px-1">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+              Couleur du logo
+            </span>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => applyTint(null)}
+                className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition ${
+                  state.logoTint === null ? "bg-slate-100 text-ink" : "text-slate-400 hover:text-ink"
+                }`}
+              >
+                Original
+              </button>
+              <input
+                type="color"
+                value={state.logoTint ?? "#000000"}
+                onChange={(e) => applyTint(e.target.value.toUpperCase())}
+                title="Couleur personnalisée"
+                className="h-6 w-7 cursor-pointer rounded border border-slate-200 bg-white"
+              />
+            </div>
+          </div>
+          <div className="flex flex-wrap justify-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5">
+            {LOGO_PALETTE.map(({ name, hex }) => {
+              const sel = state.logoTint?.toUpperCase() === hex.toUpperCase();
+              return (
+                <button
+                  key={hex}
+                  type="button"
+                  onClick={() => applyTint(hex)}
+                  title={name}
+                  className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full transition hover:scale-110 ${
+                    isLight(hex) ? "border border-slate-300" : ""
+                  } ${sel ? "ring-2 ring-ink ring-offset-1" : ""}`}
+                  style={{ backgroundColor: hex }}
+                >
+                  {sel && (
+                    <Check className={`h-3.5 w-3.5 ${isLight(hex) ? "text-ink" : "text-white"}`} />
+                  )}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      )}
     </div>
   );
+}
+
+// ─── isLight : couleur claire ? (bordure des pastilles claires) ─────────
+function isLight(hex: string): boolean {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return false;
+  const n = parseInt(m[1], 16);
+  const lum = (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+  return lum > 0.82;
 }

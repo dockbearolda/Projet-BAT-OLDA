@@ -28,7 +28,7 @@ export async function composeFacePng(
   ctx.drawImage(mock, 0, 0, c.width, c.height);
 
   if (face.logo) {
-    const logo = await loadImage(face.logo.dataUrl);
+    const logo = await loadImage(face.logoTintedUrl ?? face.logo.dataUrl);
     const lw = (face.sizePct / 100) * c.width;
     const lh = lw * (logo.naturalHeight / logo.naturalWidth);
     const cx = (face.posXPct / 100) * c.width;

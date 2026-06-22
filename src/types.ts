@@ -34,6 +34,9 @@ export interface LogoAsset {
   name: string;
   naturalWidth: number;
   naturalHeight: number;
+  /** Vrai si le logo est une silhouette monochrome (fond transparent + 1 couleur)
+   *  → recoloration possible directement dans l'app. */
+  isMonochrome: boolean;
 }
 
 export interface FaceState {
@@ -43,6 +46,10 @@ export interface FaceState {
   posYPct: number;
   /** Largeur du logo en % de la largeur du mockup. */
   sizePct: number;
+  /** Couleur de recoloration choisie (hex) pour un logo monochrome, ou null. */
+  logoTint: string | null;
+  /** Logo recoloré (dataUrl PNG) dérivé de logo.dataUrl + logoTint, ou null. */
+  logoTintedUrl: string | null;
 }
 
 export function defaultFaceState(face: Face): FaceState {
@@ -51,5 +58,7 @@ export function defaultFaceState(face: Face): FaceState {
     posXPct: 50,
     posYPct: face === "front" ? 30 : 28,
     sizePct: face === "front" ? 22 : 45,
+    logoTint: null,
+    logoTintedUrl: null,
   };
 }

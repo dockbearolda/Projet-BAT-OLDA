@@ -38,6 +38,65 @@ function loadImageDims(src: string): Promise<{ width: number; height: number }> 
   });
 }
 
+function loadImageEl(src: string): Promise<HTMLImageElement> {
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    img.crossOrigin = "anonymous";
+    img.onload = () => resolve(img);
+    img.onerror = () => reject(new Error("image decode failed"));
+    img.src = src;
+  });
+}
+
+/**
+ * Détecte si un logo est une silhouette monochrome : fond transparent + une
+ * seule couleur dominante sur les pixels opaques. Seuls ces logos peuvent être
+ * recolorés proprement (tint en préservant l'alpha).
+ */
+async function analyzeMonochrome(dataUrl: string): Promise<boolean> {
+  try {
+    const img = await loadImageEl(dataUrl);
+    const max = 256;
+    const scale = Math.min(1, max / Math.max(img.naturalWidth, img.naturalHeight));
+    const w = Math.max(1, Math.round(img.naturalWidth * scale));
+    const h = Math.max(1, Math.round(img.naturalHeight * scale));
+    const c = document.createElement("canvas");
+    c.width = w;
+    c.height = h;
+    const ctx = c.getContext("2d", { willReadFrequently: true });
+    if (!ctx) return false;
+    ctx.drawImage(img, 0, 0, w, h);
+    const { data } = ctx.getImageData(0, 0, w, h);
+
+    const total = w * h;
+    let transparent = 0;
+    let opaque = 0;
+    const buckets = new Map<number, number>(); // couleur quantifiée → count
+    for (let i = 0; i < data.length; i += 4) {
+      const a = data[i + 3];
+      if (a < 32) {
+        transparent++;
+        continue;
+      }
+      if (a < 200) continue; // bords anti-aliasés : ignorés pour la couleur
+      opaque++;
+      const key =
+        ((data[i] >> 4) << 8) | ((data[i + 1] >> 4) << 4) | (data[i + 2] >> 4);
+      buckets.set(key, (buckets.get(key) ?? 0) + 1);
+    }
+
+    // Pas de fond transparent → ce n'est pas une silhouette (photo / aplat plein).
+    if (transparent / total < 0.02) return false;
+    if (opaque < 50) return false;
+
+    let top = 0;
+    for (const v of buckets.values()) if (v > top) top = v;
+    return top / opaque >= 0.7;
+  } catch {
+    return false;
+  }
+}
+
 function isPdf(file: File): boolean {
   return file.type === "application/pdf" || /\.pdf$/i.test(file.name);
 }
@@ -120,6 +179,7 @@ export async function ingestLogo(file: File): Promise<LogoAsset> {
       name: file.name,
       naturalWidth: dims.width,
       naturalHeight: dims.height,
+      isMonochrome: await analyzeMonochrome(dataUrl),
     };
   }
 
@@ -131,6 +191,7 @@ export async function ingestLogo(file: File): Promise<LogoAsset> {
       name: file.name,
       naturalWidth: width,
       naturalHeight: height,
+      isMonochrome: await analyzeMonochrome(dataUrl),
     };
   }
 
@@ -143,6 +204,7 @@ export async function ingestLogo(file: File): Promise<LogoAsset> {
       name: file.name,
       naturalWidth: dims.width,
       naturalHeight: dims.height,
+      isMonochrome: await analyzeMonochrome(dataUrl),
     };
   }
 
