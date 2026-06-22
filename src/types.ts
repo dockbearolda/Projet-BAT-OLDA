@@ -80,13 +80,14 @@ export const SIDE_VISIBLE_FRACTION = 0.5;
 
 export function defaultFaceState(face: Face): FaceState {
   // Les côtés reçoivent un marquage manche : petit logo placé sur la manche
-  // (zone haute du profil). La vue droite étant le miroir de la gauche, son
-  // logo par défaut est positionné symétriquement.
+  // (zone haute du profil). "Côté gauche" affiche le MIROIR (manche à droite du
+  // cadre), "Côté droit" l'image d'origine (manche à gauche) → positions par
+  // défaut symétriques pour tomber sur la manche visible.
   if (face === "sideLeft") {
-    return { logo: null, posXPct: 46, posYPct: 32, sizePct: 12, logoTint: null, logoTintedUrl: null };
+    return { logo: null, posXPct: 54, posYPct: 32, sizePct: 12, logoTint: null, logoTintedUrl: null };
   }
   if (face === "sideRight") {
-    return { logo: null, posXPct: 54, posYPct: 32, sizePct: 12, logoTint: null, logoTintedUrl: null };
+    return { logo: null, posXPct: 46, posYPct: 32, sizePct: 12, logoTint: null, logoTintedUrl: null };
   }
   return {
     logo: null,

@@ -191,9 +191,9 @@ export default function App() {
         views.push({ label: "Arrière", composedPng: png });
       }
       if (showSides && sideMockupUrl) {
-        // Gauche = image d'origine, droite = miroir. Slots étroits + rognés.
-        const leftPng = await composeFacePng(sideMockupUrl, sideLeft, 2000, false);
-        const rightPng = await composeFacePng(sideMockupUrl, sideRight, 2000, true);
+        // Gauche = miroir, droite = image d'origine. Slots étroits + rognés.
+        const leftPng = await composeFacePng(sideMockupUrl, sideLeft, 2000, true);
+        const rightPng = await composeFacePng(sideMockupUrl, sideRight, 2000, false);
         views.push({
           label: "Côté gauche",
           composedPng: leftPng,
@@ -374,6 +374,7 @@ export default function App() {
               onChange={setSideLeft}
               onError={(m) => showToast(m, "error")}
               cover
+              mirror
             />
             <CanvasStage
               face="sideRight"
@@ -383,7 +384,6 @@ export default function App() {
               onChange={setSideRight}
               onError={(m) => showToast(m, "error")}
               cover
-              mirror
             />
           </>
         )}
