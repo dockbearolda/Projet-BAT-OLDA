@@ -14,6 +14,14 @@ import {
 type ToastKind = "info" | "error" | "success";
 type Toast = { id: number; msg: string; kind: ToastKind } | null;
 
+// Libellés de famille affichés dans les en-têtes du dropdown référence.
+const CATEGORY_LABELS: Record<string, string> = {
+  HOMME: "Homme",
+  FEMME: "Femme",
+  ENFANT: "Enfant",
+  BEBE: "Bébé",
+};
+
 export default function App() {
   const [manifest, setManifest] = useState<Manifest | null>(null);
   const [loadError, setLoadError] = useState<string | null>(null);
@@ -63,6 +71,22 @@ export default function App() {
     () => selectedRef?.colors.find((c) => c.slug === selectedColorSlug) ?? null,
     [selectedRef, selectedColorSlug],
   );
+
+  // Regroupe les références par famille (refs déjà triées par catégorie).
+  const groupedRefs = useMemo(() => {
+    const groups: { category: string; label: string; refs: RefEntry[] }[] = [];
+    for (const r of manifest?.refs ?? []) {
+      const last = groups[groups.length - 1];
+      if (last && last.category === r.category) last.refs.push(r);
+      else
+        groups.push({
+          category: r.category,
+          label: CATEGORY_LABELS[r.category] ?? r.category,
+          refs: [r],
+        });
+    }
+    return groups;
+  }, [manifest]);
 
   // Quand on change de référence, si la couleur courante n'existe pas
   // dans la nouvelle ref, on retombe sur sa 1ère couleur disponible.
@@ -157,18 +181,7 @@ export default function App() {
       {/* ─── Header app ─────────────────────────────────────────────── */}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-6 py-4">
-          <div className="flex items-center gap-3">
-            <div className="relative h-10 w-10 rounded-md bg-ink">
-              <div className="absolute bottom-0 right-0 h-2 w-2 translate-x-1 translate-y-1 bg-accent" />
-              <div className="flex h-full items-center justify-center text-base font-bold text-white">D</div>
-            </div>
-            <div>
-              <div className="text-sm font-bold uppercase tracking-wider text-ink">Atelier OLDA</div>
-              <div className="text-[10px] font-semibold uppercase tracking-wider text-slate-500">
-                Générateur de BAT
-              </div>
-            </div>
-          </div>
+          <OldaLogo className="h-10 w-auto text-ink" />
           <button
             type="button"
             onClick={handleGenerate}
@@ -205,17 +218,11 @@ export default function App() {
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
               Référence
             </label>
-            <select
-              value={selectedRefId}
-              onChange={(e) => setSelectedRefId(e.target.value)}
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink"
-            >
-              {manifest.refs.map((r) => (
-                <option key={r.id} value={r.id}>
-                  {r.category} · {r.label} ({r.colors.length} couleurs)
-                </option>
-              ))}
-            </select>
+            <RefSelector
+              groups={groupedRefs}
+              selected={selectedRef}
+              onSelect={setSelectedRefId}
+            />
           </div>
 
           <div>
@@ -278,12 +285,161 @@ export default function App() {
   );
 }
 
+// ─── OldaLogo : logo officiel OLDA (inline SVG, hérite de currentColor) ──
+function OldaLogo({ className }: { className?: string }) {
+  return (
+    <svg viewBox="55 68 174 176" aria-label="OLDA" fill="currentColor" className={className}>
+      <path d="M187.85,114.63h33.12c.82,0,1.48.66,1.48,1.48v34.05c0,.82-.66,1.48-1.48,1.48h-73.22c-.82,0-1.48-.66-1.48-1.48v-76.52c0-.82.66-1.48,1.48-1.48h37.15c.82,0,1.48.66,1.48,1.48v39.51c0,.82.66,1.48,1.48,1.48Z" />
+      <path d="M141.24,238.96l41.28-77.18c.58-1.05,2.09-1.05,2.67,0l41.39,77.18c.56,1.02-.18,2.26-1.34,2.26h-82.67c-1.16,0-1.89-1.24-1.34-2.26Z" />
+      <path d="M101.44,161.74h-2.56l.48,79.48h1.16c20.68,0,38.61-15.44,40.49-36.03,2.14-23.57-16.43-43.44-39.57-43.44Z" />
+      <path d="M95.36,161.74h-32.71c-.82,0-1.48.66-1.48,1.48v76.52c0,.82.66,1.48,1.48,1.48h32.26l.45-79.48Z" />
+      <path d="M140.12,108.5c-1.61-20.24-18-36.63-38.24-38.24-25.72-2.04-47.09,19.32-45.05,45.04,1.6,20.24,18,36.64,38.24,38.25.12,0,.23,0,.34.02l.23-39.79v-.05l-11.32,11.07s-1.19-11.25,6.13-12.84h-13s4.12-7.32,14.54-4.85l-7.67-7.67s11.86-1.72,12.82,6.62c1.07-8.9,12.54-6.48,12.54-6.48l-7.92,8.04c8.81-3.63,14.91,4.33,14.91,4.33h-13.05c4.85,1.4,6.01,6.08,6.2,9.41.14,2.05-.12,3.59-.12,3.59l-3.54-3.59-7.55-7.62.24,39.91c24-.2,43.23-20.71,41.29-45.17Z" />
+    </svg>
+  );
+}
+
+// ─── RefSelector : dropdown référence premium, groupé par famille ────────
+function RefSelector({
+  groups,
+  selected,
+  onSelect,
+}: {
+  groups: { category: string; label: string; refs: RefEntry[] }[];
+  selected: RefEntry | null;
+  onSelect: (id: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const rootRef = useRef<HTMLDivElement>(null);
+  const popupRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (!open) return;
+    function onDown(e: MouseEvent) {
+      if (!rootRef.current?.contains(e.target as Node)) setOpen(false);
+    }
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") setOpen(false);
+    }
+    document.addEventListener("mousedown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("mousedown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+
+  useLayoutEffect(() => {
+    if (!open || !popupRef.current) return;
+    const sel = popupRef.current.querySelector<HTMLElement>("[data-selected='true']");
+    sel?.scrollIntoView({ block: "nearest" });
+  }, [open]);
+
+  const familyLabel = selected
+    ? CATEGORY_LABELS[selected.category] ?? selected.category
+    : "";
+
+  return (
+    <div ref={rootRef} className="relative w-full">
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        aria-haspopup="listbox"
+        aria-expanded={open}
+        className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm transition hover:border-slate-400 focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink"
+      >
+        {selected ? (
+          <span className="flex min-w-0 items-center gap-2.5">
+            <span className="flex-shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+              {familyLabel}
+            </span>
+            <span className="flex-shrink-0 font-semibold text-ink">{selected.refInternal}</span>
+            <span className="truncate text-slate-400">{selected.refSupplier}</span>
+          </span>
+        ) : (
+          <span className="text-slate-400">Choisir une référence</span>
+        )}
+        <ChevronDown
+          className={`h-4 w-4 flex-shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`}
+        />
+      </button>
+
+      {open && (
+        <div
+          ref={popupRef}
+          role="listbox"
+          className="absolute left-0 right-0 top-full z-30 mt-1.5 max-h-[60vh] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl ring-1 ring-black/5"
+        >
+          {groups.map((g) => (
+            <div key={g.category}>
+              <div className="sticky top-0 z-10 flex items-center gap-2 bg-white/95 px-3 pb-1.5 pt-2.5 backdrop-blur">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                  {g.label}
+                </span>
+                <span className="h-px flex-1 bg-slate-100" />
+                <span className="text-[10px] font-medium text-slate-300">
+                  {g.refs.length}
+                </span>
+              </div>
+              {g.refs.map((r) => {
+                const isSel = selected?.id === r.id;
+                return (
+                  <button
+                    key={r.id}
+                    type="button"
+                    role="option"
+                    aria-selected={isSel}
+                    data-selected={isSel}
+                    onClick={() => {
+                      onSelect(r.id);
+                      setOpen(false);
+                    }}
+                    className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition ${
+                      isSel ? "bg-slate-50" : "hover:bg-slate-50"
+                    }`}
+                  >
+                    <span className="flex min-w-0 flex-1 flex-col">
+                      <span className="flex items-baseline gap-2">
+                        <span className="font-semibold text-ink">{r.refInternal}</span>
+                        <span className="truncate text-xs text-slate-400">{r.refSupplier}</span>
+                      </span>
+                      <span className="mt-0.5 text-[11px] text-slate-400">
+                        {r.colors.length} coloris
+                      </span>
+                    </span>
+                    {isSel ? (
+                      <Check className="h-4 w-4 flex-shrink-0 text-ink" />
+                    ) : (
+                      <span className="h-4 w-4 flex-shrink-0" />
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // ─── ColorSwatch : petit rond couleur (utilisé dans le selector) ────────
+// Bordure ajoutée pour les couleurs claires (blanc, crème, ivoire…) afin
+// qu'elles restent visibles sur le fond blanc du dropdown.
+function isLightHex(hex: string): boolean {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex);
+  if (!m) return false;
+  const n = parseInt(m[1], 16);
+  const r = (n >> 16) & 255;
+  const g = (n >> 8) & 255;
+  const b = n & 255;
+  const lum = (0.2126 * r + 0.7152 * g + 0.0722 * b) / 255;
+  return lum > 0.82;
+}
+
 function ColorSwatch({ hex, size = 14 }: { hex: string; size?: number }) {
-  const isWhite = hex.toUpperCase() === "#FFFFFF";
   return (
     <span
-      className={`inline-block flex-shrink-0 rounded-full ${isWhite ? "border border-slate-300" : ""}`}
+      className={`inline-block flex-shrink-0 rounded-full ${isLightHex(hex) ? "border border-slate-300" : ""}`}
       style={{ backgroundColor: hex, width: size, height: size }}
       aria-hidden
     />

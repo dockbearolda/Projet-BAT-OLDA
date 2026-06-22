@@ -7,7 +7,7 @@ import {
 } from "pdf-lib";
 
 import { embedAppFonts } from "./fonts";
-import { loadOldaLogoPngBytes } from "./rasterizeSvg";
+import { loadOldaLogo } from "./rasterizeSvg";
 
 export interface BatPdfView {
   label: string;        // "AVANT" | "ARRIÈRE"
@@ -117,16 +117,19 @@ function drawHeader(ctx: Ctx, input: BatPdfInput, logoImg: PDFImage): void {
   const top = PAGE_H - MARGIN;
   const bottom = top - HEADER_H;
 
-  const logoSize = 46;
+  const logoBox = 46;
+  const logoScale = logoBox / Math.max(logoImg.width, logoImg.height);
+  const lw = logoImg.width * logoScale;
+  const lh = logoImg.height * logoScale;
   ctx.page.drawImage(logoImg, {
-    x: MARGIN,
-    y: top - logoSize,
-    width: logoSize,
-    height: logoSize,
+    x: MARGIN + (logoBox - lw) / 2,
+    y: top - logoBox + (logoBox - lh) / 2,
+    width: lw,
+    height: lh,
   });
 
   drawText(ctx, "Atelier OLDA", {
-    x: MARGIN + logoSize + 12,
+    x: MARGIN + logoBox + 12,
     y: top - 16,
     size: 14,
     bold: true,
@@ -134,7 +137,7 @@ function drawHeader(ctx: Ctx, input: BatPdfInput, logoImg: PDFImage): void {
     tracking: 1.2,
   });
   drawText(ctx, "IMPRESSION TEXTILE PROFESSIONNELLE", {
-    x: MARGIN + logoSize + 12,
+    x: MARGIN + logoBox + 12,
     y: top - 30,
     size: 7,
     bold: true,
@@ -319,8 +322,8 @@ export async function buildBatPdf(input: BatPdfInput): Promise<Blob> {
 
   const { font, fontBold } = await embedAppFonts(pdf);
 
-  const [logoBytes, optimized] = await Promise.all([
-    loadOldaLogoPngBytes(),
+  const [logo, optimized] = await Promise.all([
+    loadOldaLogo(),
     Promise.all(
       input.views.map(async (v) => {
         const bytes = await optimizeMockupImage(v.composedPng);
@@ -328,7 +331,7 @@ export async function buildBatPdf(input: BatPdfInput): Promise<Blob> {
       }),
     ),
   ]);
-  const logoImg = await pdf.embedPng(logoBytes);
+  const logoImg = await pdf.embedPng(logo.bytes);
 
   const page = pdf.addPage([PAGE_W, PAGE_H]);
   const ctx: Ctx = { pdf, page, font, fontBold };

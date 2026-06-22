@@ -29,6 +29,7 @@
 import { promises as fs } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import sharp from "sharp";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 const ROOT = path.resolve(__dirname, "..");
@@ -74,6 +75,60 @@ const COLOR_META = {
   blue_sapphire:       { label: "Bleu Saphir",        hex: "#0F52BA" },
 };
 
+// ─── Échantillonnage couleur réelle ─────────────────────────────────────
+// On lit la médiane d'une petite zone centrale (poitrine) du mockup → la
+// couleur exacte du vêtement, robuste aux ombres/plis. Mockups 1500×1500,
+// vêtement centré, fond blanc → la zone centrale est toujours du tissu.
+async function sampleHex(publicUrl) {
+  try {
+    const fsPath = path.join(ROOT, "public", publicUrl); // publicUrl = "/mockups/…"
+    const meta = await sharp(fsPath).metadata();
+    const W = meta.width ?? 0;
+    const H = meta.height ?? 0;
+    if (!W || !H) return null;
+    const bw = Math.max(1, Math.round(W * 0.2));
+    const bh = Math.max(1, Math.round(H * 0.16));
+    const left = Math.round(W * 0.5 - bw / 2);
+    const top = Math.round(H * 0.5 - bh / 2);
+    const { data, info } = await sharp(fsPath)
+      .extract({ left, top, width: bw, height: bh })
+      .raw()
+      .toBuffer({ resolveWithObject: true });
+    const ch = info.channels;
+    const n = info.width * info.height;
+    const rs = new Array(n);
+    const gs = new Array(n);
+    const bs = new Array(n);
+    for (let i = 0; i < n; i++) {
+      rs[i] = data[i * ch];
+      gs[i] = data[i * ch + 1];
+      bs[i] = data[i * ch + 2];
+    }
+    const med = (a) => {
+      a.sort((x, y) => x - y);
+      return a[Math.floor(a.length / 2)];
+    };
+    const hx = (v) => v.toString(16).padStart(2, "0");
+    return `#${hx(med(rs))}${hx(med(gs))}${hx(med(bs))}`.toUpperCase();
+  } catch {
+    return null;
+  }
+}
+
+/** map asynchrone avec concurrence bornée (évite d'ouvrir 400 décodeurs d'un coup). */
+async function mapLimit(items, limit, fn) {
+  let idx = 0;
+  async function worker() {
+    while (idx < items.length) {
+      const i = idx++;
+      await fn(items[i], i);
+    }
+  }
+  await Promise.all(
+    Array.from({ length: Math.min(limit, items.length) }, worker),
+  );
+}
+
 function humanizeSlug(slug) {
   return slug
     .split("_")
@@ -84,6 +139,13 @@ function humanizeSlug(slug) {
 function parseCsvLine(line) {
   // Le manifest n'a pas de virgules dans les champs (slugs simples) → split direct.
   return line.split(",");
+}
+
+// ─── Ordre d'affichage des catégories : Homme → Femme → Enfant → Bébé ──
+const CATEGORY_ORDER = ["HOMME", "FEMME", "ENFANT", "BEBE"];
+function categoryRank(category) {
+  const i = CATEGORY_ORDER.indexOf((category ?? "").toUpperCase());
+  return i === -1 ? CATEGORY_ORDER.length : i; // catégories inconnues en dernier
 }
 
 async function main() {
@@ -130,7 +192,7 @@ async function main() {
         .map(([slug, views]) => ({
           slug,
           label: COLOR_META[slug]?.label ?? humanizeSlug(slug),
-          hex: COLOR_META[slug]?.hex ?? "#999999",
+          hex: null, // rempli par échantillonnage ci-dessous
           front: views.front ?? null,
           back: views.back ?? null,
         }))
@@ -138,7 +200,21 @@ async function main() {
         .sort((a, b) => a.label.localeCompare(b.label, "fr")),
     }))
     .filter((r) => r.colors.length > 0)
-    .sort((a, b) => a.id.localeCompare(b.id));
+    .sort(
+      (a, b) =>
+        categoryRank(a.category) - categoryRank(b.category) ||
+        a.id.localeCompare(b.id),
+    );
+
+  // Couleur EXACTE de chaque variante : échantillonnée sur son propre mockup.
+  // Fallback sur la palette OLDA, puis gris neutre si l'image est illisible.
+  const allColors = refs.flatMap((r) => r.colors);
+  let sampled = 0;
+  await mapLimit(allColors, 16, async (c) => {
+    const hex = await sampleHex(c.front || c.back);
+    if (hex) sampled++;
+    c.hex = hex ?? COLOR_META[c.slug]?.hex ?? "#999999";
+  });
 
   const colorMeta = Object.fromEntries(
     Object.entries(COLOR_META).map(([slug, meta]) => [slug, meta]),
@@ -149,7 +225,8 @@ async function main() {
 
   const colorCount = refs.reduce((acc, r) => acc + r.colors.length, 0);
   console.log(
-    `✓ manifest.json — ${refs.length} référence(s), ${colorCount} variantes couleur, écrit dans ${path.relative(ROOT, OUT_PATH)}`,
+    `✓ manifest.json — ${refs.length} référence(s), ${colorCount} variantes couleur ` +
+      `(${sampled} couleurs échantillonnées sur mockup), écrit dans ${path.relative(ROOT, OUT_PATH)}`,
   );
 }
 

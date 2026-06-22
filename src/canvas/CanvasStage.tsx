@@ -1,5 +1,5 @@
 import Konva from "konva";
-import { ImagePlus, RotateCw, Trash2 } from "lucide-react";
+import { RotateCw, Trash2 } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -311,18 +311,6 @@ export function CanvasStage({
             </Layer>
           </Stage>
         ) : null}
-
-        {/* Overlay "Cliquez pour importer" — visible uniquement quand mockup + pas de logo */}
-        {hasMockup && !hasLogo && (
-          <div className="pointer-events-none absolute inset-0 flex items-end justify-center pb-4">
-            <div className="rounded-full bg-ink/85 px-4 py-2 text-sm font-semibold text-white shadow-lg backdrop-blur transition group-hover:bg-ink">
-              <span className="inline-flex items-center gap-2">
-                <ImagePlus className="h-4 w-4" />
-                Cliquez pour importer le logo
-              </span>
-            </div>
-          </div>
-        )}
 
         <input
           ref={logoInputRef}
