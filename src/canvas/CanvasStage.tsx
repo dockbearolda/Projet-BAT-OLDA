@@ -8,7 +8,7 @@ import {
   useRef,
   useState,
 } from "react";
-import { Circle, Group, Image as KonvaImage, Layer, Line, Stage, Text, Transformer } from "react-konva";
+import { Circle, Group, Image as KonvaImage, Layer, Line, Stage, Transformer } from "react-konva";
 import { ingestLogo, IngestError } from "../ingest";
 import { LOGO_PALETTE, tintLogo } from "../logoColor";
 import {
@@ -24,31 +24,6 @@ const SNAP_TOLERANCE = 4;
 const MIN_LOGO_WIDTH_PCT = 5;
 const MAX_LOGO_WIDTH_PCT = 80;
 const LOGO_ACCEPT = "image/png,image/jpeg,image/svg+xml,application/pdf";
-
-const DUCK = "#4A6274";
-
-// Rayon d'aimantation d'une zone, en % de la largeur du mockup.
-const ZONE_SNAP_PCT = 5;
-
-interface MarkingZone {
-  id: string;
-  label: string;
-  xPct: number; // cible du CENTRE du logo
-  yPct: number;
-}
-
-// Zones de marquage standard (impression textile). Le logo s'aimante au centre
-// de la zone la plus proche. Côtés : pas de zone (marquage manche libre).
-const MARKING_ZONES: Partial<Record<Face, MarkingZone[]>> = {
-  front: [
-    { id: "centre", label: "Centre poitrine", xPct: 50, yPct: 32 },
-    { id: "coeur", label: "Cœur", xPct: 62, yPct: 29 },
-  ],
-  back: [
-    { id: "dos", label: "Dos complet", xPct: 50, yPct: 35 },
-    { id: "nuque", label: "Nuque", xPct: 50, yPct: 14 },
-  ],
-};
 
 const imageCache = new Map<string, HTMLImageElement>();
 
@@ -181,16 +156,12 @@ export function CanvasStage({
   // Pendant un drag/resize, on masque la croix de suppression (sa position est
   // dérivée de l'état, qui ne se met à jour qu'en fin d'interaction).
   const [interacting, setInteracting] = useState(false);
-  // Zone magnétique actuellement "accrochée" (mise en évidence).
-  const [activeZone, setActiveZone] = useState<string | null>(null);
   // Lecture live de la position/taille pendant le drag/resize.
   const [live, setLive] = useState<{ xPct: number; yPct: number; sizePct: number } | null>(null);
   // Une position par défaut perso est-elle enregistrée pour cette face ?
   const [hasCustomDefault, setHasCustomDefault] = useState(() => loadDefaultOverride(face) !== null);
   const [savedFlash, setSavedFlash] = useState(false);
   const flashTimer = useRef<number | null>(null);
-
-  const zones = useMemo(() => MARKING_ZONES[face] ?? [], [face]);
 
   useEffect(() => {
     setHasCustomDefault(loadDefaultOverride(face) !== null);
@@ -232,51 +203,25 @@ export function CanvasStage({
       const node = e.target;
       const w = stageSize.width;
       const h = stageSize.height;
-      let x = node.x();
-      let y = node.y();
-
-      // Aimantation aux zones standard (cible = centre du logo).
-      let zoneId: string | null = null;
-      if (zones.length) {
-        let best = (ZONE_SNAP_PCT / 100) * w;
-        let bx = x;
-        let by = y;
-        for (const z of zones) {
-          const zx = (z.xPct / 100) * w;
-          const zy = (z.yPct / 100) * h;
-          const d = Math.hypot(x - zx, y - zy);
-          if (d < best) {
-            best = d;
-            bx = zx;
-            by = zy;
-            zoneId = z.id;
-          }
-        }
-        if (zoneId) {
-          x = bx;
-          y = by;
-        }
-      }
-
-      // Repère centre (uniquement si aucune zone n'est accrochée).
       const cx = w / 2;
       const cy = h / 2;
-      const snapV = !zoneId && Math.abs(x - cx) < SNAP_TOLERANCE;
-      const snapH = !zoneId && Math.abs(y - cy) < SNAP_TOLERANCE;
+      let x = node.x();
+      let y = node.y();
+      // Léger repère de centre uniquement (lignes rouges). Déplacement libre.
+      const snapV = Math.abs(x - cx) < SNAP_TOLERANCE;
+      const snapH = Math.abs(y - cy) < SNAP_TOLERANCE;
       if (snapV) x = cx;
       if (snapH) y = cy;
-
       node.x(x);
       node.y(y);
       setSnap({ v: snapV, h: snapH });
-      setActiveZone(zoneId);
       setLive({
         xPct: clamp((x / w) * 100, 0, 100),
         yPct: clamp((y / h) * 100, 0, 100),
         sizePct: state.sizePct,
       });
     },
-    [stageSize.width, stageSize.height, zones, state.sizePct],
+    [stageSize.width, stageSize.height, state.sizePct],
   );
 
   // En mode cover (vues de côté), seule la bande centrale est visible/exportée
@@ -289,7 +234,6 @@ export function CanvasStage({
     (e: Konva.KonvaEventObject<DragEvent>) => {
       setSnap({ v: false, h: false });
       setInteracting(false);
-      setActiveZone(null);
       setLive(null);
       if (!stageSize.width) return;
       const node = e.target;
@@ -317,7 +261,6 @@ export function CanvasStage({
 
   const handleTransformEnd = useCallback(() => {
     setInteracting(false);
-    setActiveZone(null);
     setLive(null);
     const node = logoRef.current;
     if (!node || !stageSize.width) return;
@@ -377,7 +320,6 @@ export function CanvasStage({
   // Valeurs affichées dans le bandeau live : valeurs en cours de manip si dispo,
   // sinon valeurs validées de l'état.
   const disp = live ?? { xPct: state.posXPct, yPct: state.posYPct, sizePct: state.sizePct };
-  const activeZoneLabel = activeZone ? zones.find((z) => z.id === activeZone)?.label : null;
 
   return (
     <div className="flex h-full w-full min-h-0 flex-col">
@@ -444,42 +386,6 @@ export function CanvasStage({
                   listening={false}
                 />
               )}
-
-              {/* Zones magnétiques standard : repères discrets, affichés tant
-                  qu'aucun logo n'est posé OU pendant le déplacement. La zone
-                  active (logo aimanté) est mise en évidence. */}
-              {zones.length > 0 &&
-                (!hasLogo || interacting) &&
-                zones.map((z) => {
-                  const zx = (z.xPct / 100) * stageSize.width;
-                  const zy = (z.yPct / 100) * stageSize.height;
-                  const on = activeZone === z.id;
-                  return (
-                    <Group key={z.id} listening={false} opacity={on ? 1 : 0.5}>
-                      <Circle
-                        x={zx}
-                        y={zy}
-                        radius={on ? 10 : 7}
-                        stroke={DUCK}
-                        strokeWidth={on ? 2 : 1.25}
-                        dash={on ? undefined : [3, 3]}
-                        fill={on ? "rgba(74,98,116,0.16)" : undefined}
-                      />
-                      <Line points={[zx - 13, zy, zx + 13, zy]} stroke={DUCK} strokeWidth={1} opacity={on ? 0.9 : 0.4} />
-                      <Line points={[zx, zy - 13, zx, zy + 13]} stroke={DUCK} strokeWidth={1} opacity={on ? 0.9 : 0.4} />
-                      <Text
-                        x={zx - 60}
-                        y={zy + 14}
-                        width={120}
-                        align="center"
-                        text={z.label}
-                        fontSize={10}
-                        fontStyle={on ? "bold" : "normal"}
-                        fill={DUCK}
-                      />
-                    </Group>
-                  );
-                })}
             </Layer>
             <Layer>
               {logoImg && logoPx && (
@@ -573,9 +479,6 @@ export function CanvasStage({
         {/* Bandeau live : position + taille du logo (et zone aimantée). */}
         {hasLogo && stageSize.width > 0 && (
           <div className="pointer-events-none absolute bottom-2 left-2 rounded-md bg-ink/85 px-2 py-1 text-[10px] font-medium tabular-nums text-white shadow-sm">
-            {activeZoneLabel && (
-              <span className="font-semibold normal-case tracking-normal text-white">{activeZoneLabel} · </span>
-            )}
             X {Math.round(disp.xPct)}%  ·  Y {Math.round(disp.yPct)}%  ·  L {Math.round(disp.sizePct)}%
           </div>
         )}
