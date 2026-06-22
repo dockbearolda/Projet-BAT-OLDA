@@ -322,7 +322,7 @@ export function CanvasStage({
   const disp = live ?? { xPct: state.posXPct, yPct: state.posYPct, sizePct: state.sizePct };
 
   return (
-    <div className="flex h-full w-full min-h-0 flex-col">
+    <div className="relative flex h-full w-full min-h-0 flex-col">
       <div className="mb-2 flex items-center justify-between gap-2 px-1">
         <span className="min-w-0 truncate text-xs font-semibold uppercase tracking-wider text-muted">
           {label}
@@ -476,9 +476,10 @@ export function CanvasStage({
           </Stage>
         ) : null}
 
-        {/* Bandeau live : position + taille du logo (et zone aimantée). */}
+        {/* Bandeau live : position + taille du logo. En haut-gauche pour ne
+            jamais chevaucher l'overlay « couleur du logo » (bas de bulle). */}
         {hasLogo && stageSize.width > 0 && (
-          <div className="pointer-events-none absolute bottom-2 left-2 rounded-md bg-ink/85 px-2 py-1 text-[10px] font-medium tabular-nums text-white shadow-sm">
+          <div className="pointer-events-none absolute top-2 left-2 rounded-md bg-ink/85 px-2 py-1 text-[10px] font-medium tabular-nums text-white shadow-sm">
             X {Math.round(disp.xPct)}%  ·  Y {Math.round(disp.yPct)}%  ·  L {Math.round(disp.sizePct)}%
           </div>
         )}
@@ -496,35 +497,38 @@ export function CanvasStage({
         />
       </div>
 
-      {/* Bandeau de couleurs sous le t-shirt : visible quand le logo est
-          monochrome (recolorable). Clic = recoloration immédiate. */}
+      {/* Bandeau « couleur du logo » (logo monochrome). En mode paysage
+          (fitHeight) il FLOTTE au-dessus du bas de la bulle → il ne consomme
+          pas la hauteur du canvas, les bulles gardent la même taille partout.
+          Sinon (mobile / 4 vues) il est en flux sous la bulle. */}
       {state.logo?.isMonochrome && (
-        <div className="mt-3">
-          <div className="mb-1.5 flex items-center justify-between px-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-muted2">
-              Couleur du logo
-            </span>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={() => applyTint(null)}
-                className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition ${
-                  state.logoTint === null ? "bg-duck/10 text-ink" : "text-muted2 hover:text-ink"
-                }`}
-              >
-                Original
-              </button>
-              <input
-                type="color"
-                value={state.logoTint ?? "#000000"}
-                onChange={(e) => applyTint(e.target.value.toUpperCase())}
-                title="Couleur personnalisée"
-                className="h-6 w-7 cursor-pointer rounded border border-duck/15 bg-white"
-              />
+        <div className={fitHeight ? "absolute inset-x-2 bottom-2 z-20" : "mt-3"}>
+          <div className="olda-glass rounded-xl p-2.5">
+            <div className="mb-1.5 flex items-center justify-between px-0.5">
+              <span className="text-[10px] font-bold uppercase tracking-widest text-muted2">
+                Couleur du logo
+              </span>
+              <div className="flex items-center gap-2">
+                <button
+                  type="button"
+                  onClick={() => applyTint(null)}
+                  className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition ${
+                    state.logoTint === null ? "bg-duck/10 text-ink" : "text-muted2 hover:text-ink"
+                  }`}
+                >
+                  Original
+                </button>
+                <input
+                  type="color"
+                  value={state.logoTint ?? "#000000"}
+                  onChange={(e) => applyTint(e.target.value.toUpperCase())}
+                  title="Couleur personnalisée"
+                  className="h-6 w-7 cursor-pointer rounded border border-duck/15 bg-white"
+                />
+              </div>
             </div>
-          </div>
-          <div className="olda-glass flex flex-wrap justify-center gap-2 rounded-xl p-2.5">
-            {LOGO_PALETTE.map(({ name, hex }) => {
+            <div className="flex flex-wrap justify-center gap-2">
+              {LOGO_PALETTE.map(({ name, hex }) => {
               const sel = state.logoTint?.toUpperCase() === hex.toUpperCase();
               return (
                 <button
@@ -543,6 +547,7 @@ export function CanvasStage({
                 </button>
               );
             })}
+            </div>
           </div>
         </div>
       )}
