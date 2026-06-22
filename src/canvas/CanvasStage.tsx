@@ -263,7 +263,7 @@ export function CanvasStage({
   return (
     <div className="flex h-full w-full min-h-0 flex-col">
       <div className="mb-2 flex items-center px-1">
-        <span className="min-w-0 truncate text-xs font-semibold uppercase tracking-wider text-slate-500">
+        <span className="min-w-0 truncate text-xs font-semibold uppercase tracking-wider text-muted">
           {label}
         </span>
       </div>
@@ -271,7 +271,7 @@ export function CanvasStage({
       <div
         ref={containerRef}
         onClick={hasMockup && !hasLogo ? openFilePicker : undefined}
-        className={`group relative flex w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${
+        className={`olda-glass group relative flex w-full items-center justify-center overflow-hidden rounded-2xl ${
           // Côté : aspect 1:2 (= SIDE_VISIBLE_FRACTION) à TOUS les breakpoints,
           // pour que la fenêtre visible == la zone rognée du PDF (WYSIWYG).
           // fitHeight : carré en mobile, mais remplit la hauteur dispo en lg+
@@ -282,11 +282,11 @@ export function CanvasStage({
               ? "aspect-square lg:aspect-auto lg:min-h-0 lg:flex-1"
               : "aspect-square"
         } ${
-          hasMockup && !hasLogo ? "cursor-pointer transition hover:border-ink hover:shadow-md" : ""
+          hasMockup && !hasLogo ? "cursor-pointer transition hover:border-duck/40 hover:shadow-olda" : ""
         }`}
       >
         {!hasMockup ? (
-          <div className="px-6 text-center text-sm text-slate-400">
+          <div className="px-6 text-center text-sm text-muted2">
             Sélectionne d'abord une référence + couleur
           </div>
         ) : stageSize.width > 0 ? (
@@ -359,7 +359,7 @@ export function CanvasStage({
                   <Circle radius={20} fill="rgba(0,0,0,0.001)" />
                   <Circle
                     radius={12}
-                    fill="#E8001C"
+                    fill="#DC2626"
                     stroke="#FFFFFF"
                     strokeWidth={2}
                     shadowColor="#000000"
@@ -373,7 +373,7 @@ export function CanvasStage({
               {snap.v && (
                 <Line
                   points={[stageSize.width / 2, 0, stageSize.width / 2, stageSize.height]}
-                  stroke="#E8001C"
+                  stroke="#DC2626"
                   strokeWidth={1}
                   dash={[4, 4]}
                   listening={false}
@@ -382,7 +382,7 @@ export function CanvasStage({
               {snap.h && (
                 <Line
                   points={[0, stageSize.height / 2, stageSize.width, stageSize.height / 2]}
-                  stroke="#E8001C"
+                  stroke="#DC2626"
                   strokeWidth={1}
                   dash={[4, 4]}
                   listening={false}
@@ -410,7 +410,7 @@ export function CanvasStage({
       {state.logo?.isMonochrome && (
         <div className="mt-3">
           <div className="mb-1.5 flex items-center justify-between px-1">
-            <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+            <span className="text-[10px] font-bold uppercase tracking-widest text-muted2">
               Couleur du logo
             </span>
             <div className="flex items-center gap-2">
@@ -418,7 +418,7 @@ export function CanvasStage({
                 type="button"
                 onClick={() => applyTint(null)}
                 className={`rounded px-1.5 py-0.5 text-[11px] font-medium transition ${
-                  state.logoTint === null ? "bg-slate-100 text-ink" : "text-slate-400 hover:text-ink"
+                  state.logoTint === null ? "bg-duck/10 text-ink" : "text-muted2 hover:text-ink"
                 }`}
               >
                 Original
@@ -428,11 +428,11 @@ export function CanvasStage({
                 value={state.logoTint ?? "#000000"}
                 onChange={(e) => applyTint(e.target.value.toUpperCase())}
                 title="Couleur personnalisée"
-                className="h-6 w-7 cursor-pointer rounded border border-slate-200 bg-white"
+                className="h-6 w-7 cursor-pointer rounded border border-duck/15 bg-white"
               />
             </div>
           </div>
-          <div className="flex flex-wrap justify-center gap-2 rounded-xl border border-slate-200 bg-white p-2.5">
+          <div className="olda-glass flex flex-wrap justify-center gap-2 rounded-xl p-2.5">
             {LOGO_PALETTE.map(({ name, hex }) => {
               const sel = state.logoTint?.toUpperCase() === hex.toUpperCase();
               return (
@@ -442,8 +442,8 @@ export function CanvasStage({
                   onClick={() => applyTint(hex)}
                   title={name}
                   className={`flex h-7 w-7 flex-shrink-0 items-center justify-center rounded-full transition hover:scale-110 ${
-                    isLight(hex) ? "border border-slate-300" : ""
-                  } ${sel ? "ring-2 ring-ink ring-offset-1" : ""}`}
+                    isLight(hex) ? "border border-duck/25" : ""
+                  } ${sel ? "ring-2 ring-duck-focus ring-offset-1" : ""}`}
                   style={{ backgroundColor: hex }}
                 >
                   {sel && (

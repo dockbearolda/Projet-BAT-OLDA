@@ -241,6 +241,7 @@ export default function App() {
         refSupplier: selectedRef.refSupplier,
         refLabel: selectedRef.label,
         sleeveType: selectedRef.sleeveType,
+        technique: "DTF",
         colorLabel: selectedColor.label,
         colorHex: selectedColor.hex,
         views,
@@ -280,7 +281,7 @@ export default function App() {
   if (!manifest) {
     return (
       <div className="flex h-full items-center justify-center">
-        <Loader2 className="h-6 w-6 animate-spin text-slate-400" />
+        <Loader2 className="h-6 w-6 animate-spin text-muted2" />
       </div>
     );
   }
@@ -296,7 +297,7 @@ export default function App() {
       }`}
     >
       {/* ─── Header app ─────────────────────────────────────────────── */}
-      <header className="border-b border-slate-200 bg-white">
+      <header className="olda-bar border-b border-white/50">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-6 py-4">
           <img
             src={oldaLogoGlass}
@@ -309,7 +310,7 @@ export default function App() {
             type="button"
             onClick={handleGenerate}
             disabled={!canGenerate || generating}
-            className="inline-flex items-center gap-2 rounded-lg bg-ink px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition disabled:cursor-not-allowed disabled:bg-slate-300 hover:enabled:bg-black"
+            className="inline-flex items-center gap-2 rounded-xl bg-duck px-5 py-2.5 text-sm font-semibold text-white shadow-olda transition active:enabled:scale-[0.97] disabled:cursor-not-allowed disabled:bg-sage/70 disabled:text-white/90 disabled:shadow-none hover:enabled:bg-duck-hover"
           >
             {generating ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -322,10 +323,10 @@ export default function App() {
       </header>
 
       {/* ─── Form fields ────────────────────────────────────────────── */}
-      <section className="border-b border-slate-200 bg-white">
+      <section className="olda-bar border-b border-white/50">
         <div className="mx-auto grid max-w-[1400px] gap-4 px-6 py-5 sm:grid-cols-3">
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted">
               Nom du client
             </label>
             <input
@@ -333,12 +334,12 @@ export default function App() {
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
               placeholder="ex. Dupont SARL"
-              className="w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink"
+              className="w-full rounded-lg border border-duck/15 bg-white px-3 py-2 text-sm placeholder:text-muted2/70 focus:border-duck-focus focus:outline-none focus:ring-1 focus:ring-duck-focus"
             />
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted">
               Référence
             </label>
             <RefSelector
@@ -349,7 +350,7 @@ export default function App() {
           </div>
 
           <div>
-            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-slate-500">
+            <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted">
               Couleur
             </label>
             <ColorSelector
@@ -364,7 +365,7 @@ export default function App() {
         <div className="mx-auto max-w-[1400px] px-6 pb-4">
           <label
             className={`inline-flex items-center gap-2.5 text-sm ${
-              sideAvailable ? "cursor-pointer text-slate-600" : "cursor-not-allowed text-slate-400"
+              sideAvailable ? "cursor-pointer text-muted" : "cursor-not-allowed text-muted2"
             }`}
           >
             <input
@@ -372,11 +373,11 @@ export default function App() {
               checked={sidesEnabled && sideAvailable}
               disabled={!sideAvailable}
               onChange={(e) => setSidesEnabled(e.target.checked)}
-              className="h-4 w-4 rounded border-slate-300 text-ink focus:ring-1 focus:ring-ink disabled:opacity-50"
+              className="h-4 w-4 rounded border-duck/30 text-duck focus:ring-1 focus:ring-duck-focus disabled:opacity-50"
             />
             <span>Ajouter les vues de côté (manches gauche + droite)</span>
             {!sideAvailable && selectedRef && (
-              <span className="text-xs text-slate-400">— indisponible (manche longue)</span>
+              <span className="text-xs text-muted2">— indisponible (manche longue)</span>
             )}
           </label>
         </div>
@@ -438,8 +439,8 @@ export default function App() {
       </main>
 
       {/* ─── Footer aide ─────────────────────────────────────────────── */}
-      <footer className="border-t border-slate-200 bg-white px-6 py-3">
-        <p className="mx-auto max-w-[1400px] text-center text-xs text-slate-500">
+      <footer className="olda-bar border-t border-white/50 px-6 py-3">
+        <p className="mx-auto max-w-[1400px] text-center text-xs text-muted">
           Clique sur un t-shirt pour ajouter le logo. Glisse et redimensionne directement dessus (lignes rouges = centre).
           Génère le PDF, envoie-le au client — il valide d'un simple <span className="font-semibold text-ink">OK</span> sur WhatsApp.
         </p>
@@ -511,21 +512,21 @@ function RefSelector({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-3 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm transition hover:border-slate-400 focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink"
+        className="flex w-full items-center justify-between gap-3 rounded-lg border border-duck/15 bg-white px-3 py-2 text-sm transition hover:border-duck/35 focus:border-duck-focus focus:outline-none focus:ring-1 focus:ring-duck-focus"
       >
         {selected ? (
           <span className="flex min-w-0 items-center gap-2.5">
-            <span className="flex-shrink-0 rounded-md bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-slate-500">
+            <span className="flex-shrink-0 rounded-md bg-duck/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted">
               {familyLabel}
             </span>
             <span className="flex-shrink-0 font-semibold text-ink">{selected.refInternal}</span>
-            <span className="truncate text-slate-400">{selected.refSupplier}</span>
+            <span className="truncate text-muted2">{selected.refSupplier}</span>
           </span>
         ) : (
-          <span className="text-slate-400">Choisir une référence</span>
+          <span className="text-muted2">Choisir une référence</span>
         )}
         <ChevronDown
-          className={`h-4 w-4 flex-shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`}
+          className={`h-4 w-4 flex-shrink-0 text-muted2 transition ${open ? "rotate-180" : ""}`}
         />
       </button>
 
@@ -533,16 +534,16 @@ function RefSelector({
         <div
           ref={popupRef}
           role="listbox"
-          className="absolute left-0 right-0 top-full z-30 mt-1.5 max-h-[60vh] overflow-y-auto rounded-xl border border-slate-200 bg-white py-1 shadow-xl ring-1 ring-black/5"
+          className="absolute left-0 right-0 top-full z-30 mt-1.5 max-h-[60vh] overflow-y-auto rounded-xl border border-duck/12 bg-white py-1 shadow-olda ring-1 ring-black/5"
         >
           {groups.map((g) => (
             <div key={g.category}>
               <div className="sticky top-0 z-10 flex items-center gap-2 bg-white/95 px-3 pb-1.5 pt-2.5 backdrop-blur">
-                <span className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                <span className="text-[10px] font-bold uppercase tracking-widest text-muted2">
                   {g.label}
                 </span>
-                <span className="h-px flex-1 bg-slate-100" />
-                <span className="text-[10px] font-medium text-slate-300">
+                <span className="h-px flex-1 bg-duck/10" />
+                <span className="text-[10px] font-medium text-muted2">
                   {g.refs.length}
                 </span>
               </div>
@@ -560,15 +561,15 @@ function RefSelector({
                       setOpen(false);
                     }}
                     className={`flex w-full items-center gap-3 px-3 py-2.5 text-left transition ${
-                      isSel ? "bg-slate-50" : "hover:bg-slate-50"
+                      isSel ? "bg-duck/10" : "hover:bg-duck/5"
                     }`}
                   >
                     <span className="flex min-w-0 flex-1 flex-col">
                       <span className="flex items-baseline gap-2">
                         <span className="font-semibold text-ink">{r.refInternal}</span>
-                        <span className="truncate text-xs text-slate-400">{r.refSupplier}</span>
+                        <span className="truncate text-xs text-muted2">{r.refSupplier}</span>
                       </span>
-                      <span className="mt-0.5 text-[11px] text-slate-400">
+                      <span className="mt-0.5 text-[11px] text-muted2">
                         {r.colors.length} coloris
                       </span>
                     </span>
@@ -605,7 +606,7 @@ function isLightHex(hex: string): boolean {
 function ColorSwatch({ hex, size = 14 }: { hex: string; size?: number }) {
   return (
     <span
-      className={`inline-block flex-shrink-0 rounded-full ${isLightHex(hex) ? "border border-slate-300" : ""}`}
+      className={`inline-block flex-shrink-0 rounded-full ${isLightHex(hex) ? "border border-duck/25" : ""}`}
       style={{ backgroundColor: hex, width: size, height: size }}
       aria-hidden
     />
@@ -653,7 +654,7 @@ function ColorSelector({
   const current = colors.find((c) => c.slug === selected) ?? null;
 
   if (colors.length === 0) {
-    return <div className="text-sm italic text-slate-400">Aucune couleur</div>;
+    return <div className="text-sm italic text-muted2">Aucune couleur</div>;
   }
 
   return (
@@ -663,7 +664,7 @@ function ColorSelector({
         onClick={() => setOpen((v) => !v)}
         aria-haspopup="listbox"
         aria-expanded={open}
-        className="flex w-full items-center justify-between gap-2 rounded-lg border border-slate-300 bg-white px-3 py-2 text-sm transition hover:border-slate-400 focus:border-ink focus:outline-none focus:ring-1 focus:ring-ink"
+        className="flex w-full items-center justify-between gap-2 rounded-lg border border-duck/15 bg-white px-3 py-2 text-sm transition hover:border-duck/35 focus:border-duck-focus focus:outline-none focus:ring-1 focus:ring-duck-focus"
       >
         <span className="flex min-w-0 items-center gap-2.5">
           {current ? (
@@ -672,17 +673,17 @@ function ColorSelector({
               <span className="truncate font-medium text-ink">{current.label}</span>
             </>
           ) : (
-            <span className="text-slate-400">Choisir une couleur</span>
+            <span className="text-muted2">Choisir une couleur</span>
           )}
         </span>
-        <ChevronDown className={`h-4 w-4 flex-shrink-0 text-slate-400 transition ${open ? "rotate-180" : ""}`} />
+        <ChevronDown className={`h-4 w-4 flex-shrink-0 text-muted2 transition ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
         <div
           ref={popupRef}
           role="listbox"
-          className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-lg border border-slate-200 bg-white py-1 shadow-lg"
+          className="absolute left-0 right-0 top-full z-30 mt-1 max-h-72 overflow-y-auto rounded-lg border border-duck/12 bg-white py-1 shadow-olda"
         >
           {colors.map((c) => {
             const isSel = c.slug === selected;
@@ -698,7 +699,7 @@ function ColorSelector({
                   setOpen(false);
                 }}
                 className={`flex w-full items-center gap-2.5 px-3 py-2 text-left text-sm transition ${
-                  isSel ? "bg-slate-100" : "hover:bg-slate-50"
+                  isSel ? "bg-duck/10" : "hover:bg-duck/5"
                 }`}
               >
                 <ColorSwatch hex={c.hex} />

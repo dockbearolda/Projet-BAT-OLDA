@@ -2,13 +2,57 @@
 @tailwind components;
 @tailwind utilities;
 
-html, body, #root {
+/* ─── Design system OLDA ─── */
+:root {
+  --duck: #4a6274;
+  --duck-hover: #42596a;
+  --duck-focus: #6b8191;
+  --sage: #8ba0af;
+  --ink: #202930;
+  --muted: #5b6b78;
+  --muted-2: #7a8893;
+  --card: rgba(245, 247, 248, 0.72);
+  --card-border: rgba(255, 255, 255, 0.55);
+  --field-border: rgba(74, 98, 116, 0.14);
+  --shadow: 0 1px 3px rgba(32, 41, 48, 0.06), 0 14px 36px rgba(74, 98, 116, 0.12);
+}
+
+html,
+body,
+#root {
   height: 100%;
+}
+
+body {
+  background: linear-gradient(140deg, #ebeae8, #cdd4cd 50%, #adb8b9);
+  background-attachment: fixed;
+  color: var(--ink);
+  font-variant-numeric: tabular-nums; /* chiffres toujours alignés */
+}
+
+@layer components {
+  /* Carte glassmorphism claire (cartes, barres, popovers) */
+  .olda-glass {
+    background: var(--card);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+    border: 1px solid var(--card-border);
+    box-shadow: var(--shadow);
+  }
+  /* Barre pleine largeur translucide (header / sections / footer) */
+  .olda-bar {
+    background: rgba(245, 247, 248, 0.72);
+    -webkit-backdrop-filter: blur(20px) saturate(180%);
+    backdrop-filter: blur(20px) saturate(180%);
+  }
 }
 
 /* Touch-friendly target on tablet (Galaxy Tab A9+ 11") */
 @media (pointer: coarse) {
-  button, [role="button"], select, input {
+  button,
+  [role="button"],
+  select,
+  input {
     min-height: 44px;
   }
 }
