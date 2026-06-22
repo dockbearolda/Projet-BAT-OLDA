@@ -78,22 +78,71 @@ export interface FaceState {
  *  sans blanc latéral, t-shirt à la même hauteur que l'avant/arrière. */
 export const SIDE_VISIBLE_FRACTION = 0.5;
 
-export function defaultFaceState(face: Face): FaceState {
-  // Les côtés reçoivent un marquage manche : petit logo placé sur la manche
-  // (zone haute du profil). "Côté gauche" affiche le MIROIR (manche à droite du
-  // cadre), "Côté droit" l'image d'origine (manche à gauche) → positions par
-  // défaut symétriques pour tomber sur la manche visible.
-  if (face === "sideLeft") {
-    return { logo: null, posXPct: 54, posYPct: 32, sizePct: 12, logoTint: null, logoTintedUrl: null };
-  }
-  if (face === "sideRight") {
-    return { logo: null, posXPct: 46, posYPct: 32, sizePct: 12, logoTint: null, logoTintedUrl: null };
-  }
+/** Position + taille de départ d'un logo sur une face (en % du mockup). */
+export interface PlacementDefault {
+  posXPct: number;
+  posYPct: number;
+  sizePct: number;
+}
+
+// Position par défaut "usine" de chaque face. Les côtés reçoivent un marquage
+// manche : petit logo en zone haute du profil. "Côté gauche" = MIROIR (manche à
+// droite du cadre), "Côté droit" = image d'origine (manche à gauche) → positions
+// symétriques pour tomber sur la manche visible.
+function builtInPlacement(face: Face): PlacementDefault {
+  if (face === "sideLeft") return { posXPct: 54, posYPct: 32, sizePct: 12 };
+  if (face === "sideRight") return { posXPct: 46, posYPct: 32, sizePct: 12 };
   return {
-    logo: null,
     posXPct: 50,
     posYPct: face === "front" ? 30 : 28,
     sizePct: face === "front" ? 22 : 45,
+  };
+}
+
+const DEFAULT_KEY = (face: Face) => `bat-olda:default:${face}`;
+
+/** Position par défaut perso enregistrée par l'utilisateur (localStorage), ou null. */
+export function loadDefaultOverride(face: Face): PlacementDefault | null {
+  try {
+    const raw = localStorage.getItem(DEFAULT_KEY(face));
+    if (!raw) return null;
+    const o = JSON.parse(raw);
+    if (
+      typeof o?.posXPct === "number" &&
+      typeof o?.posYPct === "number" &&
+      typeof o?.sizePct === "number"
+    ) {
+      return { posXPct: o.posXPct, posYPct: o.posYPct, sizePct: o.sizePct };
+    }
+  } catch {
+    /* localStorage indisponible ou JSON corrompu → on ignore */
+  }
+  return null;
+}
+
+export function saveDefaultOverride(face: Face, d: PlacementDefault): void {
+  try {
+    localStorage.setItem(DEFAULT_KEY(face), JSON.stringify(d));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function clearDefaultOverride(face: Face): void {
+  try {
+    localStorage.removeItem(DEFAULT_KEY(face));
+  } catch {
+    /* ignore */
+  }
+}
+
+export function defaultFaceState(face: Face): FaceState {
+  const p = loadDefaultOverride(face) ?? builtInPlacement(face);
+  return {
+    logo: null,
+    posXPct: p.posXPct,
+    posYPct: p.posYPct,
+    sizePct: p.sizePct,
     logoTint: null,
     logoTintedUrl: null,
   };
