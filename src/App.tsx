@@ -295,8 +295,11 @@ export default function App() {
         </div>
       </header>
 
-      {/* ─── Form fields ────────────────────────────────────────────── */}
-      <section className="olda-bar border-b border-white/50">
+      {/* ─── Form fields ────────────────────────────────────────────────
+          relative z-30 : le backdrop-filter de .olda-bar crée un stacking
+          context ; sans z explicite, les menus déroulants resteraient sous
+          le <main> (mockups) peint après. On hisse la section au-dessus. */}
+      <section className="relative z-30 olda-bar border-b border-white/50">
         <div className="mx-auto grid max-w-[1400px] gap-4 px-6 py-5 sm:grid-cols-3">
           <div>
             <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted">
@@ -423,7 +426,7 @@ export default function App() {
       {toast && (
         <div
           key={toast.id}
-          className={`fixed bottom-6 left-1/2 -translate-x-1/2 rounded-lg px-4 py-2.5 text-sm font-medium shadow-lg ${
+          className={`fixed bottom-6 left-1/2 z-50 -translate-x-1/2 rounded-lg px-4 py-2.5 text-sm font-medium shadow-lg ${
             toast.kind === "error"
               ? "bg-red-600 text-white"
               : toast.kind === "success"
