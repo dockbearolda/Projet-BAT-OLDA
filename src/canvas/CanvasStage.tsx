@@ -90,6 +90,9 @@ export interface CanvasStageProps {
   cover?: boolean;
   /** Miroir horizontal du mockup (le logo n'est jamais miroité). Vue droite. */
   mirror?: boolean;
+  /** Sur grand écran, la bulle remplit la hauteur dispo (au lieu d'être carrée)
+   *  pour que le t-shirt tienne sans scroll en paysage tablette. */
+  fitHeight?: boolean;
 }
 
 export function CanvasStage({
@@ -101,6 +104,7 @@ export function CanvasStage({
   onError,
   cover = false,
   mirror = false,
+  fitHeight = false,
 }: CanvasStageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -257,7 +261,7 @@ export function CanvasStage({
   const openFilePicker = () => logoInputRef.current?.click();
 
   return (
-    <div className="flex h-full w-full flex-col">
+    <div className="flex h-full w-full min-h-0 flex-col">
       <div className="mb-2 flex items-center px-1">
         <span className="min-w-0 truncate text-xs font-semibold uppercase tracking-wider text-slate-500">
           {label}
@@ -268,9 +272,15 @@ export function CanvasStage({
         ref={containerRef}
         onClick={hasMockup && !hasLogo ? openFilePicker : undefined}
         className={`group relative flex w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${
-          // Aspect = SIDE_VISIBLE_FRACTION (1:2) à TOUS les breakpoints, pour que
-          // la fenêtre visible à l'écran == la zone rognée du PDF (WYSIWYG).
-          cover ? "aspect-[1/2]" : "aspect-square"
+          // Côté : aspect 1:2 (= SIDE_VISIBLE_FRACTION) à TOUS les breakpoints,
+          // pour que la fenêtre visible == la zone rognée du PDF (WYSIWYG).
+          // fitHeight : carré en mobile, mais remplit la hauteur dispo en lg+
+          // (le t-shirt se met à l'échelle et tient sans scroll en paysage).
+          cover
+            ? "aspect-[1/2]"
+            : fitHeight
+              ? "aspect-square lg:aspect-auto lg:min-h-0 lg:flex-1"
+              : "aspect-square"
         } ${
           hasMockup && !hasLogo ? "cursor-pointer transition hover:border-ink hover:shadow-md" : ""
         }`}

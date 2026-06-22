@@ -255,7 +255,15 @@ export default function App() {
   }
 
   return (
-    <div className="flex min-h-full flex-col">
+    <div
+      className={`flex min-h-full flex-col ${
+        // En mode 2 vues (par défaut), l'app remplit exactement la hauteur de
+        // l'écran sur grand format (tablette paysage, desktop) → les t-shirts
+        // tiennent sans scroll. En mode 4 vues, on laisse défiler (les profils
+        // gardent leur ratio 1:2 WYSIWYG).
+        showSides ? "" : "lg:h-full lg:overflow-hidden"
+      }`}
+    >
       {/* ─── Header app ─────────────────────────────────────────────── */}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-6 py-4">
@@ -352,7 +360,7 @@ export default function App() {
         className={`mx-auto flex w-full flex-1 flex-col gap-6 px-6 py-6 lg:grid ${
           showSides
             ? "max-w-[1700px] lg:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-start"
-            : "max-w-[1400px] lg:grid-cols-2 lg:items-start"
+            : "max-w-[1400px] lg:grid-cols-2 lg:grid-rows-[minmax(0,1fr)] lg:min-h-0 lg:py-4"
         }`}
       >
         <CanvasStage
@@ -362,6 +370,7 @@ export default function App() {
           state={front}
           onChange={setFront}
           onError={(m) => showToast(m, "error")}
+          fitHeight={!showSides}
         />
         <CanvasStage
           face="back"
@@ -370,6 +379,7 @@ export default function App() {
           state={back}
           onChange={setBack}
           onError={(m) => showToast(m, "error")}
+          fitHeight={!showSides}
         />
         {showSides && (
           <>
