@@ -80,10 +80,12 @@ const COLOR_META = {
 // de cette table est traitée comme manche courte ("short"), le cas dominant.
 // Sert à n'emprunter/recolorer un côté qu'entre vêtements du même type.
 const SLEEVE_TYPE = {
+  "H-008_NS336": "long",
   "H-009_CGTU05TC": "long",
   "L-001_LYCRA-PARAGON": "long",
   "B-002_K837": "long",
   "H-010_CGTM072": "sleeveless",
+  "H-011_K3022IC": "sleeveless",
   "F-001_NS342": "sleeveless",
 };
 function sleeveTypeOf(refId) {
