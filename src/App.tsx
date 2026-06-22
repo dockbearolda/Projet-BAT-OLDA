@@ -6,6 +6,7 @@ import { composeFacePng } from "./compose";
 import { buildBatPdf, formatBatFilename } from "./pdf/buildPdf";
 import { resolveSide } from "./sideView";
 import { recolorSide } from "./sideRecolor";
+import { LOGO_PALETTE } from "./logoColor";
 import {
   defaultFaceState,
   SIDE_VISIBLE_FRACTION,
@@ -25,6 +26,26 @@ const CATEGORY_LABELS: Record<string, string> = {
   ENFANT: "Enfant",
   BEBE: "Bébé",
 };
+
+// Info marquage d'une face pour le BAT : présence d'un logo, nom du fichier,
+// libellé de la couleur (nom de palette, hex, ou « Couleur d'origine »).
+function markInfo(state: FaceState): {
+  marked: boolean;
+  logoName: string | null;
+  markColorLabel: string | null;
+} {
+  if (!state.logo) return { marked: false, logoName: null, markColorLabel: null };
+  let markColorLabel: string;
+  if (!state.logoTint) {
+    markColorLabel = "Couleur d'origine";
+  } else {
+    const named = LOGO_PALETTE.find(
+      (p) => p.hex.toUpperCase() === state.logoTint!.toUpperCase(),
+    );
+    markColorLabel = named ? named.name : state.logoTint.toUpperCase();
+  }
+  return { marked: true, logoName: state.logo.name, markColorLabel };
+}
 
 export default function App() {
   const [manifest, setManifest] = useState<Manifest | null>(null);
@@ -182,14 +203,17 @@ export default function App() {
         label: string;
         composedPng: Blob;
         cropXFraction?: number;
+        marked?: boolean;
+        logoName?: string | null;
+        markColorLabel?: string | null;
       }> = [];
       if (frontUrl) {
         const png = await composeFacePng(frontUrl, front);
-        views.push({ label: "Avant", composedPng: png });
+        views.push({ label: "Avant", composedPng: png, ...markInfo(front) });
       }
       if (backUrl) {
         const png = await composeFacePng(backUrl, back);
-        views.push({ label: "Arrière", composedPng: png });
+        views.push({ label: "Arrière", composedPng: png, ...markInfo(back) });
       }
       if (showSides && sideMockupUrl) {
         // Gauche = miroir, droite = image d'origine. Slots étroits + rognés.
@@ -199,19 +223,26 @@ export default function App() {
           label: "Côté gauche",
           composedPng: leftPng,
           cropXFraction: SIDE_VISIBLE_FRACTION,
+          ...markInfo(sideLeft),
         });
         views.push({
           label: "Côté droit",
           composedPng: rightPng,
           cropXFraction: SIDE_VISIBLE_FRACTION,
+          ...markInfo(sideRight),
         });
       }
 
       const input = {
         clientName: clientName.trim(),
         date: new Date(),
+        category: selectedRef.category,
+        refInternal: selectedRef.refInternal,
+        refSupplier: selectedRef.refSupplier,
         refLabel: selectedRef.label,
+        sleeveType: selectedRef.sleeveType,
         colorLabel: selectedColor.label,
+        colorHex: selectedColor.hex,
         views,
       };
       const blob = await buildBatPdf(input);
