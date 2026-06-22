@@ -8,7 +8,6 @@ import {
 
 import { embedAppFonts } from "./fonts";
 import { loadOldaLogo } from "./rasterizeSvg";
-import type { SleeveType } from "../types";
 
 export interface BatPdfView {
   label: string;        // "AVANT" | "ARRIÈRE" | "CÔTÉ GAUCHE"…
@@ -16,12 +15,6 @@ export interface BatPdfView {
   /** Si défini, rogne l'image au centre à cette fraction de largeur (profils
    *  étroits) → cadre plus fin, t-shirt à la même hauteur que l'avant/arrière. */
   cropXFraction?: number;
-  /** Un logo est-il présent sur cette vue ? (caption « Sans marquage » sinon) */
-  marked?: boolean;
-  /** Nom du fichier logo déposé (info atelier). */
-  logoName?: string | null;
-  /** Couleur du marquage : nom de la palette, hex, ou « Couleur d'origine ». */
-  markColorLabel?: string | null;
 }
 
 export interface BatPdfInput {
@@ -31,7 +24,6 @@ export interface BatPdfInput {
   refInternal: string;  // ex. "H-001"
   refSupplier: string;  // ex. "NS300"
   refLabel: string;     // ex. "H-001 NS300" (titre / nom de fichier)
-  sleeveType: SleeveType;
   technique: string;    // technique de marquage, ex. "DTF"
   colorLabel: string;   // ex. "Marine"
   colorHex: string;     // ex. "#14213D"
@@ -63,9 +55,9 @@ const HEADER_H = 54;
 const SPECS_H = 50;
 const GAP = 12;
 
-// Bande basse : mentions légales + bon pour accord, posée au-dessus du pied.
+// Bande basse : mentions légales, posée au-dessus du pied.
 const FOOTER_H = 30;       // pied de page (coordonnées + infos légales, 2 lignes)
-const BAND_H = 116;        // mentions + signature
+const BAND_H = 46;         // mentions légales (pleine largeur)
 const BAND_BOTTOM = MARGIN + FOOTER_H;
 
 // ─── Palette Atelier OLDA (design system : encre froide + canard) ───────
@@ -76,12 +68,6 @@ const GRAY_LIGHT = rgb(0.945, 0.957, 0.961); // bandeau specs
 const FRAME_BG   = rgb(0.980, 0.980, 0.980);
 const BORDER     = rgb(0.855, 0.878, 0.890);
 const MUTED      = rgb(0.357, 0.420, 0.471); // #5B6B78
-
-const SLEEVE_LABEL: Record<SleeveType, string> = {
-  short: "Manche courte",
-  long: "Manche longue",
-  sleeveless: "Sans manche",
-};
 
 const CATEGORY_LABEL: Record<string, string> = {
   HOMME: "Homme",
@@ -300,7 +286,6 @@ function drawSpecs(ctx: Ctx, input: BatPdfInput, topY: number): void {
     { label: "CLIENT", value: input.clientName, swatch: undefined as string | undefined },
     { label: "FAMILLE", value: categoryLabel(input.category) },
     { label: "RÉFÉRENCE", value: refValue },
-    { label: "MANCHE", value: SLEEVE_LABEL[input.sleeveType] ?? "—" },
     { label: "TECHNIQUE", value: input.technique },
     { label: "COLORIS", value: input.colorLabel, swatch: input.colorHex },
   ];
@@ -367,7 +352,6 @@ function drawVisuals(ctx: Ctx, views: OptimizedView[], topY: number, bottomY: nu
   const frameH = frameTop - bottomY;
   const colGap = 16;
   const innerPad = 14;
-  const captionH = 16; // bande basse de chaque cadre : info marquage
 
   // Chaque image (déjà rognée à l'embarquement pour les profils) est rendue à
   // la MÊME hauteur → t-shirts à hauteur identique. La largeur d'un cadre suit
@@ -379,14 +363,14 @@ function drawVisuals(ctx: Ctx, views: OptimizedView[], topY: number, bottomY: nu
   const gaps = colGap * (views.length - 1);
   const padW = views.length * innerPad * 2;
   const imgHByWidth = (fullW - gaps - padW) / sumAspect;
-  const imgH = Math.min(frameH - innerPad * 2 - captionH, imgHByWidth);
+  const imgH = Math.min(frameH - innerPad * 2, imgHByWidth);
 
   const frameWidths = aspects.map((a) => imgH * a + innerPad * 2);
   const totalW = frameWidths.reduce((a, b) => a + b, 0) + gaps;
   let cursorX = MARGIN + (fullW - totalW) / 2; // centré horizontalement
 
   // Bloc centré verticalement dans la zone disponible.
-  const frameInnerH = imgH + innerPad * 2 + captionH;
+  const frameInnerH = imgH + innerPad * 2;
   const blockTop = frameTop - Math.max(0, (frameH - frameInnerH) / 2);
 
   views.forEach(({ view, img }, idx) => {
@@ -405,28 +389,13 @@ function drawVisuals(ctx: Ctx, views: OptimizedView[], topY: number, bottomY: nu
       borderWidth: 0.5,
     });
 
-    // Image centrée, hauteur = imgH pour toutes les vues (au-dessus du caption)
+    // Image centrée, hauteur = imgH pour toutes les vues
     const w = imgH * (img.width / img.height);
     const imgX = slotX + (fw - w) / 2;
-    const imgY = slotBottom + innerPad + captionH;
+    const imgY = slotBottom + innerPad;
     ctx.page.drawImage(img, { x: imgX, y: imgY, width: w, height: imgH });
 
-    // Caption marquage en bas du cadre
-    const caption =
-      view.marked === false
-        ? "Sans marquage"
-        : [view.markColorLabel, view.logoName].filter(Boolean).join(" · ") || "Marquage";
-    const capSize = 7;
-    const capW = Math.min(widthOf(ctx.font, caption, capSize), fw - 16);
-    drawText(ctx, caption, {
-      x: slotX + (fw - capW) / 2,
-      y: slotBottom + 6,
-      size: capSize,
-      color: MUTED,
-      maxWidth: fw - 16,
-    });
-
-    // Tag noir en haut-gauche
+    // Tag haut-gauche (canard)
     const tagText = view.label.toUpperCase();
     const tagSize = 7;
     const tagW = widthOf(ctx.fontBold, tagText, tagSize) + 16;
@@ -447,23 +416,18 @@ function drawVisuals(ctx: Ctx, views: OptimizedView[], topY: number, bottomY: nu
   });
 }
 
-// ─── BANDE BASSE : mentions légales (gauche) + bon pour accord (droite) ──
+// ─── BANDE BASSE : mentions légales (pleine largeur) ────────────────────
 const LEGAL_TEXT =
-  "En apposant votre accord ci-contre, vous validez l'intégralité du présent Bon à Tirer : " +
+  "En validant ce Bon à Tirer, vous validez l'intégralité du présent document : " +
   "visuel, textes et orthographe, emplacement et dimensions du marquage, référence et coloris du support. " +
   "Les couleurs reproduites à l'écran et sur ce document sont indicatives et peuvent différer du rendu " +
   "final sur textile. Toute erreur non signalée avant accord engage la seule responsabilité du client. " +
   "Aucune production n'est lancée sans ce bon à tirer approuvé.";
 
-function drawApprovalBand(ctx: Ctx): void {
+function drawMentions(ctx: Ctx): void {
   const top = BAND_BOTTOM + BAND_H;
   const fullW = PAGE_W - MARGIN * 2;
-  const colGap = 24;
-  const leftW = Math.round(fullW * 0.56);
-  const rightX = MARGIN + leftW + colGap;
-  const rightW = PAGE_W - MARGIN - rightX;
 
-  // ── Gauche : mentions légales ──
   drawText(ctx, "MENTIONS — BON À TIRER", {
     x: MARGIN,
     y: top - 9,
@@ -473,102 +437,12 @@ function drawApprovalBand(ctx: Ctx): void {
     tracking: 1.4,
   });
   const legalSize = 7;
-  const lines = wrapText(ctx.font, LEGAL_TEXT, legalSize, leftW);
+  const lines = wrapText(ctx.font, LEGAL_TEXT, legalSize, fullW);
   let ly = top - 24;
   for (const line of lines) {
     drawText(ctx, line, { x: MARGIN, y: ly, size: legalSize, color: MUTED });
     ly -= 9.5;
   }
-
-  // ── Droite : bon pour accord (encadré) ──
-  ctx.page.drawRectangle({
-    x: rightX,
-    y: BAND_BOTTOM,
-    width: rightW,
-    height: BAND_H,
-    borderColor: BORDER,
-    borderWidth: 0.8,
-  });
-  // Bandeau titre
-  const barH = 18;
-  ctx.page.drawRectangle({
-    x: rightX,
-    y: top - barH,
-    width: rightW,
-    height: barH,
-    color: DUCK,
-  });
-  drawText(ctx, "BON POUR ACCORD", {
-    x: rightX + 10,
-    y: top - barH + 6,
-    size: 8.5,
-    bold: true,
-    color: WHITE,
-    tracking: 1.5,
-  });
-
-  const padX = 12;
-  const ix = rightX + padX;
-  const innerW = rightW - padX * 2;
-
-  // Cases à cocher (2 lignes)
-  const checks1 = ["Bon pour accord", "Bon pour accord avec réserves"];
-  let cx = ix;
-  const cy1 = top - barH - 16;
-  const box = 8;
-  for (const c of checks1) {
-    ctx.page.drawRectangle({
-      x: cx,
-      y: cy1 - 1,
-      width: box,
-      height: box,
-      borderColor: TEXT,
-      borderWidth: 0.8,
-    });
-    drawText(ctx, c, { x: cx + box + 5, y: cy1, size: 7.5, color: TEXT });
-    cx += box + 5 + widthOf(ctx.font, c, 7.5) + 16;
-  }
-  const cy2 = cy1 - 15;
-  ctx.page.drawRectangle({
-    x: ix,
-    y: cy2 - 1,
-    width: box,
-    height: box,
-    borderColor: TEXT,
-    borderWidth: 0.8,
-  });
-  drawText(ctx, "Modifications demandées (voir remarques)", {
-    x: ix + box + 5,
-    y: cy2,
-    size: 7.5,
-    color: TEXT,
-  });
-
-  // Champs date / nom + zone signature
-  const fieldY = cy2 - 20;
-  drawText(ctx, "Date :", { x: ix, y: fieldY, size: 8, bold: true, color: TEXT });
-  ctx.page.drawLine({
-    start: { x: ix + 30, y: fieldY - 2 },
-    end: { x: ix + innerW * 0.42, y: fieldY - 2 },
-    thickness: 0.6,
-    color: BORDER,
-  });
-  drawText(ctx, "Nom :", { x: ix + innerW * 0.5, y: fieldY, size: 8, bold: true, color: TEXT });
-  ctx.page.drawLine({
-    start: { x: ix + innerW * 0.5 + 30, y: fieldY - 2 },
-    end: { x: ix + innerW, y: fieldY - 2 },
-    thickness: 0.6,
-    color: BORDER,
-  });
-  drawText(ctx, "Signature :", { x: ix, y: fieldY - 18, size: 8, bold: true, color: TEXT });
-
-  // Note validation rapide (workflow WhatsApp)
-  drawText(ctx, "Validation rapide : un « OK » par retour de message vaut accord.", {
-    x: ix,
-    y: BAND_BOTTOM + 7,
-    size: 6.5,
-    color: MUTED,
-  });
 }
 
 // ─── PIED DE PAGE : coordonnées + infos légales + n° BAT (2 lignes) ─────
@@ -677,7 +551,7 @@ export async function buildBatPdf(input: BatPdfInput): Promise<Blob> {
   drawHeader(ctx, input, logoImg, bat);
   drawSpecs(ctx, input, specsTop);
   drawVisuals(ctx, optimized, visualsTop, visualsBottom);
-  drawApprovalBand(ctx);
+  drawMentions(ctx);
   drawFooter(ctx, input, bat);
 
   const bytes = await pdf.save({ useObjectStreams: true });
