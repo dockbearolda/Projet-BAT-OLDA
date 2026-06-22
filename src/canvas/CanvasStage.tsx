@@ -1,5 +1,5 @@
 import Konva from "konva";
-import { Check, RotateCw, Trash2 } from "lucide-react";
+import { Check } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -11,7 +11,7 @@ import {
 import { Circle, Group, Image as KonvaImage, Layer, Line, Stage, Transformer } from "react-konva";
 import { ingestLogo, IngestError } from "../ingest";
 import { LOGO_PALETTE, tintLogo } from "../logoColor";
-import type { Face, FaceState } from "../types";
+import { SIDE_VISIBLE_FRACTION, type Face, type FaceState } from "../types";
 
 const SNAP_TOLERANCE = 4;
 const MIN_LOGO_WIDTH_PCT = 5;
@@ -85,6 +85,11 @@ export interface CanvasStageProps {
   state: FaceState;
   onChange: (next: FaceState | ((prev: FaceState) => FaceState)) => void;
   onError?: (msg: string) => void;
+  /** Rognage par la hauteur : le mockup remplit la hauteur de la bulle et son
+   *  blanc latéral déborde (clippé). Pour les profils étroits (vues de côté). */
+  cover?: boolean;
+  /** Miroir horizontal du mockup (le logo n'est jamais miroité). Vue droite. */
+  mirror?: boolean;
 }
 
 export function CanvasStage({
@@ -94,6 +99,8 @@ export function CanvasStage({
   state,
   onChange,
   onError,
+  cover = false,
+  mirror = false,
 }: CanvasStageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -108,10 +115,17 @@ export function CanvasStage({
 
   const stageSize = useMemo(() => {
     if (!boxW || !boxH) return { width: 0, height: 0 };
+    if (cover) {
+      // Remplit la hauteur ; la largeur (mockup carré) déborde et est clippée
+      // par la bulle → profil étroit, t-shirt à pleine hauteur.
+      const fitH = boxH;
+      const fitW = fitH * mockupAspect;
+      return { width: Math.round(fitW), height: Math.round(fitH) };
+    }
     const fitW = Math.min(boxW, boxH * mockupAspect);
     const fitH = fitW / mockupAspect;
     return { width: Math.round(fitW), height: Math.round(fitH) };
-  }, [boxW, boxH, mockupAspect]);
+  }, [boxW, boxH, mockupAspect, cover]);
 
   const logoAspect = useMemo(() => {
     if (!state.logo) return 1;
@@ -164,6 +178,12 @@ export function CanvasStage({
     [stageSize.width, stageSize.height],
   );
 
+  // En mode cover (vues de côté), seule la bande centrale est visible/exportée
+  // (largeur SIDE_VISIBLE_FRACTION). On y borne la position X du logo pour
+  // qu'il ne puisse pas être lâché dans la zone latérale rognée.
+  const xMinPct = cover ? 50 - 50 * SIDE_VISIBLE_FRACTION : 0;
+  const xMaxPct = cover ? 50 + 50 * SIDE_VISIBLE_FRACTION : 100;
+
   const handleDragEnd = useCallback(
     (e: Konva.KonvaEventObject<DragEvent>) => {
       setSnap({ v: false, h: false });
@@ -172,11 +192,11 @@ export function CanvasStage({
       const node = e.target;
       onChange({
         ...state,
-        posXPct: clamp((node.x() / stageSize.width) * 100, 0, 100),
+        posXPct: clamp((node.x() / stageSize.width) * 100, xMinPct, xMaxPct),
         posYPct: clamp((node.y() / stageSize.height) * 100, 0, 100),
       });
     },
-    [stageSize.width, stageSize.height, onChange, state],
+    [stageSize.width, stageSize.height, onChange, state, xMinPct, xMaxPct],
   );
 
   const handleTransformEnd = useCallback(() => {
@@ -194,11 +214,11 @@ export function CanvasStage({
     );
     onChange({
       ...state,
-      posXPct: clamp((node.x() / stageSize.width) * 100, 0, 100),
+      posXPct: clamp((node.x() / stageSize.width) * 100, xMinPct, xMaxPct),
       posYPct: clamp((node.y() / stageSize.height) * 100, 0, 100),
       sizePct: Math.round(newSizePct),
     });
-  }, [stageSize.width, stageSize.height, onChange, state]);
+  }, [stageSize.width, stageSize.height, onChange, state, xMinPct, xMaxPct]);
 
   async function handleLogoFile(f: File) {
     try {
@@ -238,36 +258,20 @@ export function CanvasStage({
 
   return (
     <div className="flex h-full w-full flex-col">
-      <div className="mb-2 flex items-center justify-between px-1">
-        <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">
+      <div className="mb-2 flex items-center px-1">
+        <span className="min-w-0 truncate text-xs font-semibold uppercase tracking-wider text-slate-500">
           {label}
         </span>
-        {hasLogo && (
-          <div className="flex items-center gap-1">
-            <button
-              type="button"
-              onClick={openFilePicker}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-slate-500 transition hover:bg-slate-100 hover:text-ink"
-              title="Remplacer le logo"
-            >
-              <RotateCw className="h-3.5 w-3.5" /> Remplacer
-            </button>
-            <button
-              type="button"
-              onClick={removeLogo}
-              className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs text-slate-500 transition hover:bg-red-50 hover:text-accent"
-              title="Retirer le logo"
-            >
-              <Trash2 className="h-3.5 w-3.5" /> Retirer
-            </button>
-          </div>
-        )}
       </div>
 
       <div
         ref={containerRef}
         onClick={hasMockup && !hasLogo ? openFilePicker : undefined}
-        className={`group relative flex aspect-square w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${
+        className={`group relative flex w-full items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-white shadow-sm ${
+          // Aspect = SIDE_VISIBLE_FRACTION (1:2) à TOUS les breakpoints, pour que
+          // la fenêtre visible à l'écran == la zone rognée du PDF (WYSIWYG).
+          cover ? "aspect-[1/2]" : "aspect-square"
+        } ${
           hasMockup && !hasLogo ? "cursor-pointer transition hover:border-ink hover:shadow-md" : ""
         }`}
       >
@@ -281,10 +285,11 @@ export function CanvasStage({
               {mockupImg && (
                 <KonvaImage
                   image={mockupImg}
-                  x={0}
+                  x={mirror ? stageSize.width : 0}
                   y={0}
                   width={stageSize.width}
                   height={stageSize.height}
+                  scaleX={mirror ? -1 : 1}
                   listening={false}
                 />
               )}

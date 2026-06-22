@@ -75,6 +75,28 @@ const COLOR_META = {
   blue_sapphire:       { label: "Bleu Saphir",        hex: "#0F52BA" },
 };
 
+// ─── Type de manche par référence ───────────────────────────────────────
+// Déterminé visuellement (cf. planche-contact des faces). Toute réf absente
+// de cette table est traitée comme manche courte ("short"), le cas dominant.
+// Sert à n'emprunter/recolorer un côté qu'entre vêtements du même type.
+const SLEEVE_TYPE = {
+  "H-009_CGTU05TC": "long",
+  "L-001_LYCRA-PARAGON": "long",
+  "B-002_K837": "long",
+  "H-010_CGTM072": "sleeveless",
+  "F-001_NS342": "sleeveless",
+};
+function sleeveTypeOf(refId) {
+  return SLEEVE_TYPE[refId] ?? "short";
+}
+
+function lumOfHex(hex) {
+  const m = /^#?([0-9a-f]{6})$/i.exec(hex || "");
+  if (!m) return null;
+  const n = parseInt(m[1], 16);
+  return (0.2126 * ((n >> 16) & 255) + 0.7152 * ((n >> 8) & 255) + 0.0722 * (n & 255)) / 255;
+}
+
 // ─── Échantillonnage couleur réelle ─────────────────────────────────────
 // On lit la médiane d'une petite zone centrale (poitrine) du mockup → la
 // couleur exacte du vêtement, robuste aux ombres/plis. Mockups 1500×1500,
@@ -188,6 +210,7 @@ async function main() {
   const refs = [...refMap.values()]
     .map((r) => ({
       ...r,
+      sleeveType: sleeveTypeOf(r.id),
       colors: [...r.colors.entries()]
         .map(([slug, views]) => ({
           slug,
@@ -195,6 +218,7 @@ async function main() {
           hex: null, // rempli par échantillonnage ci-dessous
           front: views.front ?? null,
           back: views.back ?? null,
+          sleeve: views.sleeve ?? null,
         }))
         .filter((c) => c.front || c.back)
         .sort((a, b) => a.label.localeCompare(b.label, "fr")),
@@ -220,13 +244,90 @@ async function main() {
     Object.entries(COLOR_META).map(([slug, meta]) => [slug, meta]),
   );
 
-  const out = { generatedAt: new Date().toISOString(), refs, colorMeta };
+  // ─── Bibliothèque des vues de côté ────────────────────────────────────
+  // Index de tous les côtés existants (un par couleur), pour réutiliser un
+  // côté générique du bon type de manche + couleur la plus proche quand un
+  // vêtement n'a pas son propre côté. La couleur du côté == celle de la
+  // variante (même vêtement), donc on réutilise le hex déjà échantillonné.
+  const sideLibrary = [];
+  for (const r of refs) {
+    for (const c of r.colors) {
+      if (c.sleeve) {
+        sideLibrary.push({
+          sleeveType: r.sleeveType,
+          slug: c.slug,
+          hex: c.hex,
+          url: c.sleeve,
+        });
+      }
+    }
+  }
+
+  // Gabarit de recoloration par type de manche. La recolo réutilise la
+  // SILHOUETTE du gabarit, donc on le prend dans la référence la plus
+  // représentative du type (celle qui a le plus de côtés), puis on choisit la
+  // couleur dont la luminance est la plus proche du gris moyen (~0.5) →
+  // meilleure source pour un dégradé (noir → couleur → blanc) qui préserve les
+  // ombres. Absent pour un type sans aucun côté (ex. manche longue) → la vue
+  // côté sera indisponible pour ces modèles.
+  const countByRefType = new Map(); // `${refId}|${type}` → nb côtés
+  const refOfEntry = new Map();     // url → refId (pour regrouper)
+  for (const r of refs) {
+    for (const c of r.colors) {
+      if (c.sleeve) {
+        const k = `${r.id}|${r.sleeveType}`;
+        countByRefType.set(k, (countByRefType.get(k) ?? 0) + 1);
+        refOfEntry.set(c.sleeve, r.id);
+      }
+    }
+  }
+  const bestRefForType = {}; // type → refId le plus fourni
+  for (const [k, n] of countByRefType) {
+    const [refId, type] = k.split("|");
+    const cur = bestRefForType[type];
+    if (!cur || n > cur.n) bestRefForType[type] = { refId, n };
+  }
+  const sideTemplates = {};
+  for (const entry of sideLibrary) {
+    const lum = lumOfHex(entry.hex);
+    if (lum == null) continue;
+    const preferredRef = bestRefForType[entry.sleeveType]?.refId;
+    const fromPreferred = refOfEntry.get(entry.url) === preferredRef;
+    const score = Math.abs(lum - 0.5);
+    const cur = sideTemplates[entry.sleeveType];
+    // On privilégie un côté de la réf de référence ; à préférence égale, la
+    // luminance la plus centrale.
+    const better =
+      !cur ||
+      (fromPreferred && !cur.fromPreferred) ||
+      (fromPreferred === cur.fromPreferred && score < cur.score);
+    if (better) {
+      sideTemplates[entry.sleeveType] = { url: entry.url, score, fromPreferred };
+    }
+  }
+  const sideTemplatesOut = Object.fromEntries(
+    Object.entries(sideTemplates).map(([t, v]) => [t, v.url]),
+  );
+
+  const out = {
+    generatedAt: new Date().toISOString(),
+    refs,
+    colorMeta,
+    sideLibrary,
+    sideTemplates: sideTemplatesOut,
+  };
   await fs.writeFile(OUT_PATH, JSON.stringify(out, null, 2), "utf8");
 
   const colorCount = refs.reduce((acc, r) => acc + r.colors.length, 0);
+  const sleeveCount = refs.reduce(
+    (acc, r) => acc + r.colors.filter((c) => c.sleeve).length,
+    0,
+  );
   console.log(
     `✓ manifest.json — ${refs.length} référence(s), ${colorCount} variantes couleur ` +
-      `(${sampled} couleurs échantillonnées sur mockup), écrit dans ${path.relative(ROOT, OUT_PATH)}`,
+      `(${sampled} couleurs échantillonnées sur mockup), ${sleeveCount} côté(s), ` +
+      `gabarits côté: [${Object.keys(sideTemplatesOut).join(", ") || "aucun"}], ` +
+      `écrit dans ${path.relative(ROOT, OUT_PATH)}`,
   );
 }
 

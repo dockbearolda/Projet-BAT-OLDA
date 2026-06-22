@@ -30,11 +30,19 @@ ressemblent (idem manche longue) ; seule la **couleur** distingue deux côtés.
 
 ## Comportement cible
 
-1. **Vue « Côté » optionnelle.** Un bouton **« + Ajouter la vue de côté »**.
-   Tant qu'on ne clique pas, le BAT reste à face/dos. Une fois ajoutée, on peut
-   la retirer.
+> **MAJ (2026-06-22)** : la vue de côté unique est devenue **deux vues** —
+> **Côté gauche** (image de profil d'origine) + **Côté droit** (miroir
+> horizontal de la gauche ; un t-shirt est symétrique). Le logo n'est **jamais
+> miroité** (texte lisible des deux côtés). Les bulles manche sont **étroites**
+> (profil rogné au centre, fraction `SIDE_VISIBLE_FRACTION = 0.5`), à la **même
+> hauteur** que l'avant/arrière.
+
+1. **Vues de côté optionnelles.** Une **case à cocher discrète** « Ajouter les
+   vues de côté (manches gauche + droite) » sous les champs. Cochée → les deux
+   côtés apparaissent ; décochée → BAT face/dos. Désactivée + grisée
+   (« indisponible — manche longue ») quand aucun gabarit n'existe.
 2. **Logo sur la manche.** Même interaction que face/dos : drag, resize,
-   recoloration monochrome. Position/échelle propres à la vue côté.
+   recoloration monochrome. Position/échelle propres à chaque côté.
 3. **Image de côté choisie automatiquement**, par ordre de fidélité :
    1. **côté propre** à la réf+couleur s'il existe (67 %) — fidélité parfaite ;
    2. sinon **côté emprunté** : même `sleeveType`, couleur la plus proche
@@ -91,20 +99,33 @@ ressemblent (idem manche longue) ; seule la **couleur** distingue deux côtés.
 
 ## Contraintes de layout (dures)
 
-- **Côté gauche** : on affiche le profil gauche du t-shirt. Si l'image source
-  montre le côté droit, on la **retourne horizontalement** (flip) pour obtenir
-  le côté gauche. Vérifié visuellement à l'implémentation.
-- **Bulles (cartes) identiques** : la carte de la vue côté doit faire
-  **exactement la même taille** que les cartes Face/Dos. L'ajout de la 3ᵉ vue ne
-  doit **ni redimensionner ni déformer** la page ni les deux cartes existantes.
-- **T-shirts même hauteur** : le visuel t-shirt rendu dans la vue côté a la
-  **même hauteur** que dans Face/Dos (échelle cohérente entre les 3 vues), à
-  l'écran **et** dans le PDF.
+- **Côté gauche + droit** : deux profils, le droit = miroir horizontal du
+  gauche (mockup miroité, logo jamais miroité). L'image d'origine est étiquetée
+  « Côté gauche » ; à confirmer côté métier (swap trivial si inversé).
+- **Bulles manche étroites** : largeur réduite (~moitié de l'avant), via un
+  rendu « cover » (remplit la hauteur, rogne le blanc latéral central). À
+  l'écran : grille `[2fr 2fr 1fr 1fr]` + bulle manche `aspect-[1/2]`. Au PDF :
+  image rognée (`cropXFraction`) → cadre plus fin.
+- **T-shirts même hauteur** : tous les t-shirts (avant, arrière, gauche, droit)
+  ont la **même hauteur**, à l'écran **et** dans le PDF (hauteur d'image
+  commune en PDF ; aspect-square vs aspect-1/2 à l'écran → même hauteur).
+- **Page non déformée** : avant/arrière restent larges, l'ajout des côtés ne
+  casse pas la mise en page.
 
 ## Hors périmètre (YAGNI)
 - Pas de vues lifestyle/alt (présentes dans le CSV mais non utilisées).
 - Pas de recoloration des faces/dos (déjà des images réelles par couleur).
 - Pas de gestion multi-page PDF.
+
+## Limitations connues (revue adversariale 2026-06-22)
+
+- **Dip-dye / bicolore sans côté propre** : le hex est échantillonné au centre
+  poitrine (haut clair d'un dégradé) → un dip-dye sans son propre côté affiche
+  un profil **uni clair approximatif** (un dégradé n'est pas recolorable en une
+  teinte). Les dip-dye qui ont leur côté propre sont corrects. À traiter à part
+  si besoin (désactiver le côté pour ces coloris, ou exiger l'image réelle).
+- **Couleurs sans front/back** (vues `alt`/`lifestyle` seules) sont écartées du
+  catalogue → leur éventuel côté n'est pas indexé. Impact marginal.
 
 ## Risques / arbitrages
 - **Recolor gabarit** : fidélité photo légèrement moindre sur ombres pour les

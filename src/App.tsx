@@ -3,8 +3,11 @@ import { Check, ChevronDown, Download, Loader2 } from "lucide-react";
 import { CanvasStage } from "./canvas/CanvasStage";
 import { composeFacePng } from "./compose";
 import { buildBatPdf, formatBatFilename } from "./pdf/buildPdf";
+import { resolveSide } from "./sideView";
+import { recolorSide } from "./sideRecolor";
 import {
   defaultFaceState,
+  SIDE_VISIBLE_FRACTION,
   type ColorVariant,
   type FaceState,
   type Manifest,
@@ -31,6 +34,11 @@ export default function App() {
   const [selectedColorSlug, setSelectedColorSlug] = useState<string>("");
   const [front, setFront] = useState<FaceState>(() => defaultFaceState("front"));
   const [back, setBack] = useState<FaceState>(() => defaultFaceState("back"));
+  // Vues de côté optionnelles : gauche (image d'origine) + droite (miroir).
+  const [sideLeft, setSideLeft] = useState<FaceState>(() => defaultFaceState("sideLeft"));
+  const [sideRight, setSideRight] = useState<FaceState>(() => defaultFaceState("sideRight"));
+  const [sidesEnabled, setSidesEnabled] = useState(false);
+  const [sideMockupUrl, setSideMockupUrl] = useState<string | null>(null);
   const [generating, setGenerating] = useState(false);
   const [toast, setToast] = useState<Toast>(null);
   const toastTimer = useRef<number | null>(null);
@@ -101,6 +109,54 @@ export default function App() {
   const frontUrl = selectedColor?.front ?? null;
   const backUrl = selectedColor?.back ?? null;
 
+  // ─── Vue de côté : résolution image (propre / empruntée / recolorée) ────
+  const sideResolution = useMemo(() => {
+    if (!manifest || !selectedRef || !selectedColor) return null;
+    return resolveSide(
+      selectedRef,
+      selectedColor,
+      manifest.sideLibrary,
+      manifest.sideTemplates,
+    );
+  }, [manifest, selectedRef, selectedColor]);
+
+  const sideAvailable = sideResolution !== null && sideResolution.kind !== "unavailable";
+
+  // Résout l'URL d'image du côté : directe (own/borrowed) ou recolorée à la
+  // volée (recolor). Annulable pour ne pas appliquer un résultat périmé.
+  useEffect(() => {
+    let cancelled = false;
+    if (!sideResolution || sideResolution.kind === "unavailable") {
+      setSideMockupUrl(null);
+      return;
+    }
+    if (sideResolution.kind === "recolor") {
+      // On efface l'image AVANT le calcul async : pendant la recoloration,
+      // sideMockupUrl=null → showSides devient faux (les côtés disparaissent et
+      // sont exclus du PDF), donc jamais de couleur périmée affichée/exportée.
+      setSideMockupUrl(null);
+      recolorSide(sideResolution.templateUrl, sideResolution.hex)
+        .then((url) => {
+          if (!cancelled) setSideMockupUrl(url);
+        })
+        .catch(() => {
+          if (!cancelled) setSideMockupUrl(null);
+        });
+    } else {
+      setSideMockupUrl(sideResolution.url);
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [sideResolution]);
+
+  // Si les vues côté deviennent indisponibles (réf manche longue), on désactive.
+  useEffect(() => {
+    if (!sideAvailable && sidesEnabled) setSidesEnabled(false);
+  }, [sideAvailable, sidesEnabled]);
+
+  const showSides = sidesEnabled && sideAvailable && sideMockupUrl !== null;
+
   // ─── Toast helper ─────────────────────────────────────────────────────
   function showToast(msg: string, kind: ToastKind = "info") {
     setToast({ id: Date.now(), msg, kind });
@@ -113,13 +169,19 @@ export default function App() {
     clientName.trim().length > 0 &&
     selectedRef !== null &&
     selectedColor !== null &&
-    (front.logo !== null || back.logo !== null);
+    (front.logo !== null ||
+      back.logo !== null ||
+      (showSides && (sideLeft.logo !== null || sideRight.logo !== null)));
 
   async function handleGenerate() {
     if (!canGenerate || !selectedRef || !selectedColor) return;
     setGenerating(true);
     try {
-      const views: Array<{ label: string; composedPng: Blob }> = [];
+      const views: Array<{
+        label: string;
+        composedPng: Blob;
+        cropXFraction?: number;
+      }> = [];
       if (frontUrl) {
         const png = await composeFacePng(frontUrl, front);
         views.push({ label: "Avant", composedPng: png });
@@ -127,6 +189,21 @@ export default function App() {
       if (backUrl) {
         const png = await composeFacePng(backUrl, back);
         views.push({ label: "Arrière", composedPng: png });
+      }
+      if (showSides && sideMockupUrl) {
+        // Gauche = image d'origine, droite = miroir. Slots étroits + rognés.
+        const leftPng = await composeFacePng(sideMockupUrl, sideLeft, 2000, false);
+        const rightPng = await composeFacePng(sideMockupUrl, sideRight, 2000, true);
+        views.push({
+          label: "Côté gauche",
+          composedPng: leftPng,
+          cropXFraction: SIDE_VISIBLE_FRACTION,
+        });
+        views.push({
+          label: "Côté droit",
+          composedPng: rightPng,
+          cropXFraction: SIDE_VISIBLE_FRACTION,
+        });
       }
 
       const input = {
@@ -236,10 +313,41 @@ export default function App() {
             />
           </div>
         </div>
+
+        {/* Case discrète : ajoute les deux vues de côté (gauche + droite). */}
+        <div className="mx-auto max-w-[1400px] px-6 pb-4">
+          <label
+            className={`inline-flex items-center gap-2.5 text-sm ${
+              sideAvailable ? "cursor-pointer text-slate-600" : "cursor-not-allowed text-slate-400"
+            }`}
+          >
+            <input
+              type="checkbox"
+              checked={sidesEnabled && sideAvailable}
+              disabled={!sideAvailable}
+              onChange={(e) => setSidesEnabled(e.target.checked)}
+              className="h-4 w-4 rounded border-slate-300 text-ink focus:ring-1 focus:ring-ink disabled:opacity-50"
+            />
+            <span>Ajouter les vues de côté (manches gauche + droite)</span>
+            {!sideAvailable && selectedRef && (
+              <span className="text-xs text-slate-400">— indisponible (manche longue)</span>
+            )}
+          </label>
+        </div>
       </section>
 
-      {/* ─── Canvas avant / arrière ─────────────────────────────────── */}
-      <main className="mx-auto flex w-full max-w-[1400px] flex-1 flex-col gap-6 px-6 py-6 lg:grid lg:grid-cols-2 lg:items-start">
+      {/* ─── Canvas avant / arrière / côtés ─────────────────────────────
+          Avant/Arrière = bulles larges. Côté gauche/droit = bulles ÉTROITES
+          (profil rogné), t-shirts à la MÊME hauteur. La droite est le miroir
+          de la gauche (un t-shirt est symétrique) ; le logo n'est jamais
+          miroité. */}
+      <main
+        className={`mx-auto flex w-full flex-1 flex-col gap-6 px-6 py-6 lg:grid ${
+          showSides
+            ? "max-w-[1700px] lg:grid-cols-[minmax(0,2fr)_minmax(0,2fr)_minmax(0,1fr)_minmax(0,1fr)] lg:items-start"
+            : "max-w-[1400px] lg:grid-cols-2 lg:items-start"
+        }`}
+      >
         <CanvasStage
           face="front"
           label="Avant"
@@ -256,6 +364,29 @@ export default function App() {
           onChange={setBack}
           onError={(m) => showToast(m, "error")}
         />
+        {showSides && (
+          <>
+            <CanvasStage
+              face="sideLeft"
+              label="Côté gauche"
+              mockupUrl={sideMockupUrl}
+              state={sideLeft}
+              onChange={setSideLeft}
+              onError={(m) => showToast(m, "error")}
+              cover
+            />
+            <CanvasStage
+              face="sideRight"
+              label="Côté droit"
+              mockupUrl={sideMockupUrl}
+              state={sideRight}
+              onChange={setSideRight}
+              onError={(m) => showToast(m, "error")}
+              cover
+              mirror
+            />
+          </>
+        )}
       </main>
 
       {/* ─── Footer aide ─────────────────────────────────────────────── */}
