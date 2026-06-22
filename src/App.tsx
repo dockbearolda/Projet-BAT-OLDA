@@ -1,6 +1,7 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { Check, ChevronDown, Download, Loader2 } from "lucide-react";
 import { CanvasStage } from "./canvas/CanvasStage";
+import oldaLogoGlass from "./assets/olda-logo-glass.svg";
 import { composeFacePng } from "./compose";
 import { buildBatPdf, formatBatFilename } from "./pdf/buildPdf";
 import { resolveSide } from "./sideView";
@@ -258,7 +259,13 @@ export default function App() {
       {/* ─── Header app ─────────────────────────────────────────────── */}
       <header className="border-b border-slate-200 bg-white">
         <div className="mx-auto flex max-w-[1400px] items-center justify-between gap-4 px-6 py-4">
-          <OldaLogo className="h-10 w-auto text-ink" />
+          <img
+            src={oldaLogoGlass}
+            alt="OLDA"
+            width={44}
+            height={44}
+            className="h-11 w-11 flex-shrink-0"
+          />
           <button
             type="button"
             onClick={handleGenerate}
@@ -413,19 +420,6 @@ export default function App() {
         </div>
       )}
     </div>
-  );
-}
-
-// ─── OldaLogo : logo officiel OLDA (inline SVG, hérite de currentColor) ──
-function OldaLogo({ className }: { className?: string }) {
-  return (
-    <svg viewBox="55 68 174 176" aria-label="OLDA" fill="currentColor" className={className}>
-      <path d="M187.85,114.63h33.12c.82,0,1.48.66,1.48,1.48v34.05c0,.82-.66,1.48-1.48,1.48h-73.22c-.82,0-1.48-.66-1.48-1.48v-76.52c0-.82.66-1.48,1.48-1.48h37.15c.82,0,1.48.66,1.48,1.48v39.51c0,.82.66,1.48,1.48,1.48Z" />
-      <path d="M141.24,238.96l41.28-77.18c.58-1.05,2.09-1.05,2.67,0l41.39,77.18c.56,1.02-.18,2.26-1.34,2.26h-82.67c-1.16,0-1.89-1.24-1.34-2.26Z" />
-      <path d="M101.44,161.74h-2.56l.48,79.48h1.16c20.68,0,38.61-15.44,40.49-36.03,2.14-23.57-16.43-43.44-39.57-43.44Z" />
-      <path d="M95.36,161.74h-32.71c-.82,0-1.48.66-1.48,1.48v76.52c0,.82.66,1.48,1.48,1.48h32.26l.45-79.48Z" />
-      <path d="M140.12,108.5c-1.61-20.24-18-36.63-38.24-38.24-25.72-2.04-47.09,19.32-45.05,45.04,1.6,20.24,18,36.64,38.24,38.25.12,0,.23,0,.34.02l.23-39.79v-.05l-11.32,11.07s-1.19-11.25,6.13-12.84h-13s4.12-7.32,14.54-4.85l-7.67-7.67s11.86-1.72,12.82,6.62c1.07-8.9,12.54-6.48,12.54-6.48l-7.92,8.04c8.81-3.63,14.91,4.33,14.91,4.33h-13.05c4.85,1.4,6.01,6.08,6.2,9.41.14,2.05-.12,3.59-.12,3.59l-3.54-3.59-7.55-7.62.24,39.91c24-.2,43.23-20.71,41.29-45.17Z" />
-    </svg>
   );
 }
 
