@@ -24,6 +24,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   FEMME: "Femme",
   ENFANT: "Enfant",
   BEBE: "Bébé",
+  POCHETTE: "Pochette",
 };
 
 export default function App() {
@@ -337,26 +338,29 @@ export default function App() {
           </div>
         </div>
 
-        {/* Case discrète : ajoute les deux vues de côté (gauche + droite). */}
-        <div className="mx-auto max-w-[1400px] px-6 pb-4">
-          <label
-            className={`inline-flex items-center gap-2.5 text-sm ${
-              sideAvailable ? "cursor-pointer text-muted" : "cursor-not-allowed text-muted2"
-            }`}
-          >
-            <input
-              type="checkbox"
-              checked={sidesEnabled && sideAvailable}
-              disabled={!sideAvailable}
-              onChange={(e) => setSidesEnabled(e.target.checked)}
-              className="h-4 w-4 rounded border-duck/30 text-duck focus:ring-1 focus:ring-duck-focus disabled:opacity-50"
-            />
-            <span>Ajouter les vues de côté (manches gauche + droite)</span>
-            {!sideAvailable && selectedRef && (
-              <span className="text-xs text-muted2">— indisponible (manche longue)</span>
-            )}
-          </label>
-        </div>
+        {/* Case discrète : ajoute les deux vues de côté (gauche + droite).
+            Masquée pour les articles sans notion de côté (ex. pochette). */}
+        {selectedRef && selectedRef.sleeveType !== "none" && (
+          <div className="mx-auto max-w-[1400px] px-6 pb-4">
+            <label
+              className={`inline-flex items-center gap-2.5 text-sm ${
+                sideAvailable ? "cursor-pointer text-muted" : "cursor-not-allowed text-muted2"
+              }`}
+            >
+              <input
+                type="checkbox"
+                checked={sidesEnabled && sideAvailable}
+                disabled={!sideAvailable}
+                onChange={(e) => setSidesEnabled(e.target.checked)}
+                className="h-4 w-4 rounded border-duck/30 text-duck focus:ring-1 focus:ring-duck-focus disabled:opacity-50"
+              />
+              <span>Ajouter les vues de côté (manches gauche + droite)</span>
+              {!sideAvailable && (
+                <span className="text-xs text-muted2">— indisponible pour ce modèle</span>
+              )}
+            </label>
+          </div>
+        )}
       </section>
 
       {/* ─── Canvas avant / arrière / côtés ─────────────────────────────

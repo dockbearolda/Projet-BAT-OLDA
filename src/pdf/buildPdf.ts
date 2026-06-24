@@ -74,6 +74,7 @@ const CATEGORY_LABEL: Record<string, string> = {
   FEMME: "Femme",
   ENFANT: "Enfant",
   BEBE: "Bébé",
+  POCHETTE: "Pochette",
 };
 
 interface Ctx {

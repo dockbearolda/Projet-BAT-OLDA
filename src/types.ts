@@ -7,8 +7,9 @@ export const FACE_LABEL: Record<Face, string> = {
   sideRight: "Côté droit",
 };
 
-/** Type de manche d'un vêtement — conditionne quel côté générique réutiliser. */
-export type SleeveType = "short" | "long" | "sleeveless";
+/** Type de manche d'un vêtement — conditionne quel côté générique réutiliser.
+ *  "none" : article sans manche/sans côté (ex. pochette) → aucune vue de côté. */
+export type SleeveType = "short" | "long" | "sleeveless" | "none";
 
 export interface ColorVariant {
   slug: string;

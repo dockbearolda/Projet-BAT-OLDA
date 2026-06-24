@@ -73,6 +73,17 @@ const COLOR_META = {
   aquamarine:          { label: "Aigue-marine",       hex: "#7FCDCD" },
   adriatic_blue:       { label: "Bleu Adriatique",    hex: "#1F6FA0" },
   blue_sapphire:       { label: "Bleu Saphir",        hex: "#0F52BA" },
+  // ─── Pochette KI3210 — gamme "Washed" (hex affinés par échantillonnage) ──
+  washed_natural:      { label: "Naturel Délavé",     hex: "#E5DCC5" },
+  washed_pearl_blue:   { label: "Bleu Perle Délavé",  hex: "#B8C9CE" },
+  washed_dream_blue:   { label: "Bleu Rêve Délavé",   hex: "#A9C0D0" },
+  washed_lichen_green: { label: "Vert Lichen Délavé", hex: "#9CA98C" },
+  washed_misty_green:  { label: "Vert Brume Délavé",  hex: "#AEC0B2" },
+  washed_sierra:       { label: "Sierra Délavé",      hex: "#B98C76" },
+  washed_tawny_orange: { label: "Orange Fauve Délavé",hex: "#C98B5E" },
+  washed_lit_peach:    { label: "Pêche Délavé",       hex: "#E8C3A8" },
+  washed_parma_pink:   { label: "Rose Parme Délavé",  hex: "#D8B8C4" },
+  washed_lit_purple:   { label: "Violet Délavé",      hex: "#9E8FB0" },
 };
 
 // ─── Type de manche par référence ───────────────────────────────────────
@@ -87,6 +98,9 @@ const SLEEVE_TYPE = {
   "H-010_CGTM072": "sleeveless",
   "H-011_K3022IC": "sleeveless",
   "F-001_NS342": "sleeveless",
+  // Pochette : pas de manche ni de côté → "none" (aucun gabarit) → vue côté
+  // indisponible, on n'emprunte jamais un côté de t-shirt.
+  "P-001_KI3210": "none",
 };
 function sleeveTypeOf(refId) {
   return SLEEVE_TYPE[refId] ?? "short";
@@ -165,8 +179,8 @@ function parseCsvLine(line) {
   return line.split(",");
 }
 
-// ─── Ordre d'affichage des catégories : Homme → Femme → Enfant → Bébé ──
-const CATEGORY_ORDER = ["HOMME", "FEMME", "ENFANT", "BEBE"];
+// ─── Ordre d'affichage des catégories : Homme → Femme → Enfant → Bébé → Pochette ──
+const CATEGORY_ORDER = ["HOMME", "FEMME", "ENFANT", "BEBE", "POCHETTE"];
 function categoryRank(category) {
   const i = CATEGORY_ORDER.indexOf((category ?? "").toUpperCase());
   return i === -1 ? CATEGORY_ORDER.length : i; // catégories inconnues en dernier
