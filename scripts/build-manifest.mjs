@@ -73,6 +73,8 @@ const COLOR_META = {
   aquamarine:          { label: "Aigue-marine",       hex: "#7FCDCD" },
   adriatic_blue:       { label: "Bleu Adriatique",    hex: "#1F6FA0" },
   blue_sapphire:       { label: "Bleu Saphir",        hex: "#0F52BA" },
+  ivory:               { label: "Ivoire",             hex: "#F5F0E6" },
+  petal_rose:          { label: "Rose Pétale",        hex: "#E8C4C9" },
   // ─── Pochette KI3210 — gamme "Washed" (hex affinés par échantillonnage) ──
   washed_natural:      { label: "Naturel Délavé",     hex: "#E5DCC5" },
   washed_pearl_blue:   { label: "Bleu Perle Délavé",  hex: "#B8C9CE" },
@@ -213,7 +215,9 @@ async function main() {
         refInternal,
         refSupplier,
         category,
-        label: `${refInternal} ${refSupplier}`,
+        // Réf sans code interne (ex. NS309 en attente d'attribution) → on
+        // n'affiche que le code fournisseur, sans espace en tête.
+        label: [refInternal, refSupplier].filter(Boolean).join(" "),
         colors: new Map(),
       });
     }
