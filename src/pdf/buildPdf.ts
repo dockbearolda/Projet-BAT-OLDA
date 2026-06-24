@@ -278,10 +278,12 @@ function drawSpecs(ctx: Ctx, input: BatPdfInput, topY: number): void {
     color: GRAY_LIGHT,
   });
 
-  const refValue =
-    input.refSupplier && input.refSupplier.trim()
-      ? `${input.refInternal} · ${input.refSupplier}`
-      : input.refInternal;
+  // Réf interne + fournisseur séparés par « · », en ignorant les champs vides
+  // (une réf sans code interne n'affiche que le code fournisseur).
+  const refValue = [input.refInternal, input.refSupplier]
+    .map((s) => (s || "").trim())
+    .filter(Boolean)
+    .join(" · ");
 
   const cols = [
     { label: "CLIENT", value: input.clientName, swatch: undefined as string | undefined },
