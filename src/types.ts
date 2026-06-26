@@ -72,19 +72,6 @@ export interface FaceState {
   logoTint: string | null;
   /** Logo recoloré (dataUrl PNG) dérivé de logo.dataUrl + logoTint, ou null. */
   logoTintedUrl: string | null;
-  /** Dimensions du marquage EN MILLIMÈTRES (largeur × hauteur), null si non
-   *  renseigné. Affichées sous le visuel sur le BAT (ex. « 250 × 300 mm »). */
-  markWidthMm: number | null;
-  markHeightMm: number | null;
-}
-
-/** Met en forme des dimensions de marquage (mm) → « 250 × 300 mm », « 250 mm »,
- *  ou "" si rien n'est renseigné. */
-export function formatMarkSizeMm(width: number | null, height: number | null): string {
-  if (width != null && height != null) return `${width} × ${height} mm`;
-  if (width != null) return `${width} mm`;
-  if (height != null) return `${height} mm`;
-  return "";
 }
 
 /** Les vues de côté affichent un t-shirt de profil (centré, étroit). La bulle
@@ -159,7 +146,5 @@ export function defaultFaceState(face: Face): FaceState {
     sizePct: p.sizePct,
     logoTint: null,
     logoTintedUrl: null,
-    markWidthMm: null,
-    markHeightMm: null,
   };
 }

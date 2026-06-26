@@ -10,7 +10,6 @@ import { OrderSizesEditor } from "./OrderSizesEditor";
 import { activeOrderSizes, defaultOrderSizes, type OrderSize } from "./orderSizes";
 import {
   defaultFaceState,
-  formatMarkSizeMm,
   SIDE_VISIBLE_FRACTION,
   type ColorVariant,
   type FaceState,
@@ -117,19 +116,12 @@ export default function App() {
     }
   }, [selectedRef, selectedColorSlug]);
 
-  // Nouvelle référence = nouveau vêtement/nouveau job : on réinclut les deux
-  // faces et on efface la taille de marquage (les dimensions décrivaient le
-  // marquage de l'article précédent). Le changement de couleur, lui, conserve
-  // tout (même article). Les tailles de commande restent (souvent ré-utilisées).
+  // Nouvelle référence = nouveau vêtement : on réinclut les deux faces. Les
+  // tailles de commande (et leurs dimensions de logo) restent — souvent
+  // réutilisées d'un support à l'autre. Le changement de couleur ne touche rien.
   useEffect(() => {
     setFrontIncluded(true);
     setBackIncluded(true);
-    const clearMark = (p: FaceState) =>
-      p.markWidthMm !== null || p.markHeightMm !== null
-        ? { ...p, markWidthMm: null, markHeightMm: null }
-        : p;
-    setFront(clearMark);
-    setBack(clearMark);
   }, [selectedRefId]);
 
   const frontUrl = selectedColor?.front ?? null;
@@ -222,19 +214,14 @@ export default function App() {
         label: string;
         composedPng: Blob;
         cropXFraction?: number;
-        markSize?: string;
       }> = [];
       if (frontUrl && frontIncluded) {
         const png = await composeFacePng(frontUrl, front);
-        // La taille du marquage (en mm) ne décrit un marquage que s'il y a un
-        // logo : pas de légende « Marquage · … » sous un t-shirt nu.
-        const mark = front.logo ? formatMarkSizeMm(front.markWidthMm, front.markHeightMm) : "";
-        views.push({ label: "Avant", composedPng: png, markSize: mark || undefined });
+        views.push({ label: "Avant", composedPng: png });
       }
       if (backUrl && backIncluded) {
         const png = await composeFacePng(backUrl, back);
-        const mark = back.logo ? formatMarkSizeMm(back.markWidthMm, back.markHeightMm) : "";
-        views.push({ label: "Arrière", composedPng: png, markSize: mark || undefined });
+        views.push({ label: "Arrière", composedPng: png });
       }
       if (showSides && sideMockupUrl) {
         // Gauche = miroir, droite = image d'origine. Slots étroits + rognés.
@@ -433,7 +420,6 @@ export default function App() {
           onChange={setFront}
           onError={(m) => showToast(m, "error")}
           fitHeight={!showSides}
-          showMarkSize
           included={frontIncluded}
           onToggleIncluded={(next) => toggleFaceIncluded("front", next)}
         />
@@ -445,7 +431,6 @@ export default function App() {
           onChange={setBack}
           onError={(m) => showToast(m, "error")}
           fitHeight={!showSides}
-          showMarkSize
           included={backIncluded}
           onToggleIncluded={(next) => toggleFaceIncluded("back", next)}
         />

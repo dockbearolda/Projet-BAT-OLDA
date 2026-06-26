@@ -85,12 +85,6 @@ function clamp(n: number, min: number, max: number): number {
   return Math.max(min, Math.min(max, n));
 }
 
-/** Champ mm → entier ≥ 0 borné, ou null si vide. */
-function parseMm(raw: string): number | null {
-  if (raw.trim() === "") return null;
-  return Math.max(0, Math.min(99999, Math.floor(Number(raw) || 0)));
-}
-
 export interface CanvasStageProps {
   face: Face;
   label: string;
@@ -106,8 +100,6 @@ export interface CanvasStageProps {
   /** Sur grand écran, la bulle remplit la hauteur dispo (au lieu d'être carrée)
    *  pour que le t-shirt tienne sans scroll en paysage tablette. */
   fitHeight?: boolean;
-  /** Affiche le champ « taille du marquage » sous la bulle (faces avant/arrière). */
-  showMarkSize?: boolean;
   /** Si défini, affiche un bouton inclure/exclure cette face du BAT. */
   included?: boolean;
   onToggleIncluded?: (next: boolean) => void;
@@ -123,7 +115,6 @@ export function CanvasStage({
   cover = false,
   mirror = false,
   fitHeight = false,
-  showMarkSize = false,
   included = true,
   onToggleIncluded,
 }: CanvasStageProps) {
@@ -577,43 +568,6 @@ export function CanvasStage({
           }}
         />
       </div>
-
-      {showMarkSize && (
-        <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1.5 px-1">
-          <label
-            htmlFor={`markw-${face}`}
-            className="flex-shrink-0 text-[11px] font-semibold uppercase tracking-wider text-muted"
-          >
-            Taille du marquage
-          </label>
-          <div className="flex items-center gap-1.5">
-            <input
-              id={`markw-${face}`}
-              type="number"
-              min={0}
-              inputMode="numeric"
-              value={state.markWidthMm ?? ""}
-              onChange={(e) => onChange({ ...state, markWidthMm: parseMm(e.target.value) })}
-              placeholder="larg."
-              aria-label="Largeur du marquage en millimètres"
-              className="w-16 rounded-lg border border-duck/15 bg-white px-2 py-1.5 text-center text-base tabular-nums sm:text-sm placeholder:text-muted2/70 focus:border-duck-focus focus:outline-none focus:ring-1 focus:ring-duck-focus"
-            />
-            <span className="text-muted2">×</span>
-            <input
-              id={`markh-${face}`}
-              type="number"
-              min={0}
-              inputMode="numeric"
-              value={state.markHeightMm ?? ""}
-              onChange={(e) => onChange({ ...state, markHeightMm: parseMm(e.target.value) })}
-              placeholder="haut."
-              aria-label="Hauteur du marquage en millimètres"
-              className="w-16 rounded-lg border border-duck/15 bg-white px-2 py-1.5 text-center text-base tabular-nums sm:text-sm placeholder:text-muted2/70 focus:border-duck-focus focus:outline-none focus:ring-1 focus:ring-duck-focus"
-            />
-            <span className="flex-shrink-0 text-xs font-semibold text-muted2">mm</span>
-          </div>
-        </div>
-      )}
     </div>
   );
 }
