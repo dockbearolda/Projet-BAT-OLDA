@@ -10,6 +10,7 @@ import { OrderSizesEditor } from "./OrderSizesEditor";
 import { activeOrderSizes, defaultOrderSizes, type OrderSize } from "./orderSizes";
 import {
   defaultFaceState,
+  formatMarkSizeMm,
   SIDE_VISIBLE_FRACTION,
   type ColorVariant,
   type FaceState,
@@ -123,8 +124,12 @@ export default function App() {
   useEffect(() => {
     setFrontIncluded(true);
     setBackIncluded(true);
-    setFront((p) => (p.markSize ? { ...p, markSize: "" } : p));
-    setBack((p) => (p.markSize ? { ...p, markSize: "" } : p));
+    const clearMark = (p: FaceState) =>
+      p.markWidthMm !== null || p.markHeightMm !== null
+        ? { ...p, markWidthMm: null, markHeightMm: null }
+        : p;
+    setFront(clearMark);
+    setBack(clearMark);
   }, [selectedRefId]);
 
   const frontUrl = selectedColor?.front ?? null;
@@ -221,13 +226,15 @@ export default function App() {
       }> = [];
       if (frontUrl && frontIncluded) {
         const png = await composeFacePng(frontUrl, front);
-        // La taille du marquage ne décrit un marquage que s'il y a un logo :
-        // pas de légende « Marquage · … » sous un t-shirt nu.
-        views.push({ label: "Avant", composedPng: png, markSize: front.logo ? front.markSize : undefined });
+        // La taille du marquage (en mm) ne décrit un marquage que s'il y a un
+        // logo : pas de légende « Marquage · … » sous un t-shirt nu.
+        const mark = front.logo ? formatMarkSizeMm(front.markWidthMm, front.markHeightMm) : "";
+        views.push({ label: "Avant", composedPng: png, markSize: mark || undefined });
       }
       if (backUrl && backIncluded) {
         const png = await composeFacePng(backUrl, back);
-        views.push({ label: "Arrière", composedPng: png, markSize: back.logo ? back.markSize : undefined });
+        const mark = back.logo ? formatMarkSizeMm(back.markWidthMm, back.markHeightMm) : "";
+        views.push({ label: "Arrière", composedPng: png, markSize: mark || undefined });
       }
       if (showSides && sideMockupUrl) {
         // Gauche = miroir, droite = image d'origine. Slots étroits + rognés.
