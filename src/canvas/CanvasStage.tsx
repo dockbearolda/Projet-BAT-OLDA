@@ -1,5 +1,5 @@
 import Konva from "konva";
-import { Check } from "lucide-react";
+import { Check, Eye, EyeOff } from "lucide-react";
 import {
   useCallback,
   useEffect,
@@ -100,6 +100,11 @@ export interface CanvasStageProps {
   /** Sur grand écran, la bulle remplit la hauteur dispo (au lieu d'être carrée)
    *  pour que le t-shirt tienne sans scroll en paysage tablette. */
   fitHeight?: boolean;
+  /** Affiche le champ « taille du marquage » sous la bulle (faces avant/arrière). */
+  showMarkSize?: boolean;
+  /** Si défini, affiche un bouton inclure/exclure cette face du BAT. */
+  included?: boolean;
+  onToggleIncluded?: (next: boolean) => void;
 }
 
 export function CanvasStage({
@@ -112,6 +117,9 @@ export function CanvasStage({
   cover = false,
   mirror = false,
   fitHeight = false,
+  showMarkSize = false,
+  included = true,
+  onToggleIncluded,
 }: CanvasStageProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const logoInputRef = useRef<HTMLInputElement>(null);
@@ -371,28 +379,46 @@ export function CanvasStage({
           {label}
         </span>
         {state.logo?.isMonochrome && paletteDots}
-        {hasLogo && (
-          <div className="flex flex-shrink-0 items-center gap-1.5">
-            <button
-              type="button"
-              onClick={setAsDefault}
-              title="Mémoriser cette position et cette taille comme départ des prochains logos de cette face"
-              className="rounded px-1.5 py-0.5 text-[11px] font-medium text-duck transition hover:bg-duck/10"
-            >
-              {savedFlash ? "✓ Enregistré" : "Définir par défaut"}
-            </button>
-            {hasCustomDefault && (
+        <div className="flex flex-shrink-0 items-center gap-1.5">
+          {hasLogo && (
+            <>
               <button
                 type="button"
-                onClick={resetDefault}
-                title="Revenir à la position standard"
-                className="rounded px-1.5 py-0.5 text-[11px] font-medium text-muted2 transition hover:text-ink"
+                onClick={setAsDefault}
+                title="Mémoriser cette position et cette taille comme départ des prochains logos de cette face"
+                className="rounded px-1.5 py-0.5 text-[11px] font-medium text-duck transition hover:bg-duck/10"
               >
-                Réinitialiser
+                {savedFlash ? "✓ Enregistré" : "Définir par défaut"}
               </button>
-            )}
-          </div>
-        )}
+              {hasCustomDefault && (
+                <button
+                  type="button"
+                  onClick={resetDefault}
+                  title="Revenir à la position standard"
+                  className="rounded px-1.5 py-0.5 text-[11px] font-medium text-muted2 transition hover:text-ink"
+                >
+                  Réinitialiser
+                </button>
+              )}
+            </>
+          )}
+          {onToggleIncluded && (
+            <button
+              type="button"
+              onClick={() => onToggleIncluded(!included)}
+              title={included ? "Exclure cette face du BAT" : "Inclure cette face dans le BAT"}
+              aria-pressed={included}
+              className={`inline-flex h-8 items-center gap-1.5 rounded-lg border px-2 text-[11px] font-semibold transition active:scale-[0.97] ${
+                included
+                  ? "border-duck/20 bg-duck/10 text-duck hover:bg-duck/15"
+                  : "border-duck/15 bg-white text-muted2 hover:text-ink"
+              }`}
+            >
+              {included ? <Eye className="h-3.5 w-3.5" /> : <EyeOff className="h-3.5 w-3.5" />}
+              <span className="hidden sm:inline">{included ? "Dans le BAT" : "Exclue"}</span>
+            </button>
+          )}
+        </div>
       </div>
 
       <div
@@ -410,8 +436,13 @@ export function CanvasStage({
               : "aspect-square"
         } ${
           hasMockup && !hasLogo ? "cursor-pointer transition hover:border-duck/40 hover:shadow-olda" : ""
-        }`}
+        } ${included ? "" : "opacity-55 saturate-[0.6]"}`}
       >
+        {onToggleIncluded && !included && (
+          <div className="pointer-events-none absolute left-1/2 top-2 z-10 -translate-x-1/2 rounded-full bg-ink/85 px-3 py-1 text-[10px] font-semibold uppercase tracking-wider text-white shadow-sm">
+            Exclue du BAT
+          </div>
+        )}
         {!hasMockup ? (
           <div className="px-6 text-center text-sm text-muted2">
             Sélectionne d'abord une référence + couleur
@@ -541,6 +572,25 @@ export function CanvasStage({
         />
       </div>
 
+      {showMarkSize && (
+        <div className="mt-2 flex items-center gap-2 px-1">
+          <label
+            htmlFor={`marksize-${face}`}
+            className="flex-shrink-0 text-[11px] font-semibold uppercase tracking-wider text-muted"
+          >
+            Taille du marquage
+          </label>
+          <input
+            id={`marksize-${face}`}
+            type="text"
+            value={state.markSize}
+            onChange={(e) => onChange({ ...state, markSize: e.target.value })}
+            placeholder="ex. 25 × 30 cm, A4…"
+            inputMode="text"
+            className="min-w-0 flex-1 rounded-lg border border-duck/15 bg-white px-2.5 py-1.5 text-base sm:text-sm placeholder:text-muted2/70 focus:border-duck-focus focus:outline-none focus:ring-1 focus:ring-duck-focus"
+          />
+        </div>
+      )}
     </div>
   );
 }
