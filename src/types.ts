@@ -72,6 +72,9 @@ export interface FaceState {
   logoTint: string | null;
   /** Logo recoloré (dataUrl PNG) dérivé de logo.dataUrl + logoTint, ou null. */
   logoTintedUrl: string | null;
+  /** Taille / dimensions du marquage saisies par l'utilisateur (ex. "25 × 30 cm",
+   *  "A4"). Texte libre, affiché sous le visuel sur le BAT. Vide = non renseigné. */
+  markSize: string;
 }
 
 /** Les vues de côté affichent un t-shirt de profil (centré, étroit). La bulle
@@ -146,5 +149,6 @@ export function defaultFaceState(face: Face): FaceState {
     sizePct: p.sizePct,
     logoTint: null,
     logoTintedUrl: null,
+    markSize: "",
   };
 }

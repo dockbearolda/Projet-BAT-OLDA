@@ -8,6 +8,7 @@ import {
 
 import { embedAppFonts } from "./fonts";
 import { loadOldaLogo } from "./rasterizeSvg";
+import { formatOrderSizes } from "../orderSizes";
 
 export interface BatPdfView {
   label: string;        // "AVANT" | "ARRIÈRE" | "CÔTÉ GAUCHE"…
@@ -15,6 +16,8 @@ export interface BatPdfView {
   /** Si défini, rogne l'image au centre à cette fraction de largeur (profils
    *  étroits) → cadre plus fin, t-shirt à la même hauteur que l'avant/arrière. */
   cropXFraction?: number;
+  /** Taille / dimensions du marquage (ex. "25 × 30 cm"), affichée sous le visuel. */
+  markSize?: string;
 }
 
 export interface BatPdfInput {
@@ -28,6 +31,8 @@ export interface BatPdfInput {
   colorLabel: string;   // ex. "Marine"
   colorHex: string;     // ex. "#14213D"
   views: BatPdfView[];  // [avant, arrière, côté gauche, côté droit]
+  /** Tailles & quantités commandées (ex. 15 S, 2 M). Vide/absent = pas de bandeau. */
+  orderSizes?: { label: string; qty: number }[];
 }
 
 // ─── Coordonnées de l'atelier (pied de page officiel) ───────────────────
@@ -53,6 +58,7 @@ const MARGIN = 32;
 
 const HEADER_H = 54;
 const SPECS_H = 50;
+const ORDER_H = 34;        // bandeau « quantités par taille » (optionnel)
 const GAP = 12;
 
 // Bande basse : mentions légales, posée au-dessus du pied.
@@ -115,6 +121,23 @@ function drawText(ctx: Ctx, text: string, opts: DrawTextOpts): void {
 
 function widthOf(font: PDFFont, text: string, size: number): number {
   return font.widthOfTextAtSize(text, size);
+}
+
+/** Plus grande taille de police (de maxSize vers minSize) pour laquelle `text`
+ *  tient dans `maxWidth` sur une ligne. Évite la troncature « … » d'une liste
+ *  de tailles un peu longue sur le BAT (réduit plutôt que coupe). */
+function fitFontSize(
+  font: PDFFont,
+  text: string,
+  maxSize: number,
+  minSize: number,
+  maxWidth: number,
+): number {
+  let size = maxSize;
+  while (size > minSize && font.widthOfTextAtSize(text, size) > maxWidth) {
+    size -= 0.5;
+  }
+  return size;
 }
 
 /** Découpe un texte en lignes qui tiennent dans maxWidth (retour à la ligne). */
@@ -342,6 +365,53 @@ function drawSpecs(ctx: Ctx, input: BatPdfInput, topY: number): void {
   });
 }
 
+// ─── COMMANDE : bandeau « quantités par taille » (15 S · 2 M · …) ────────
+function drawOrderStrip(
+  ctx: Ctx,
+  sizes: { label: string; qty: number }[],
+  topY: number,
+): void {
+  const bottom = topY - ORDER_H;
+  const fullW = PAGE_W - MARGIN * 2;
+  const padX = 16;
+
+  ctx.page.drawRectangle({ x: MARGIN, y: bottom, width: fullW, height: ORDER_H, color: GRAY_LIGHT });
+  // Filet canard à gauche (rappel d'accent).
+  ctx.page.drawRectangle({ x: MARGIN, y: bottom, width: 3, height: ORDER_H, color: DUCK });
+
+  const total = sizes.reduce((s, x) => s + x.qty, 0);
+  const totalText = `Total : ${total} ${total > 1 ? "pièces" : "pièce"}`;
+  const totalSize = 10;
+  const totalW = widthOf(ctx.fontBold, totalText, totalSize);
+
+  drawText(ctx, "QUANTITÉS PAR TAILLE", {
+    x: MARGIN + padX,
+    y: topY - 13,
+    size: 7,
+    bold: true,
+    color: MUTED,
+    tracking: 1.5,
+  });
+  const detail = formatOrderSizes(sizes);
+  const detailMax = fullW - padX * 2 - totalW - 16;
+  const detailSize = fitFontSize(ctx.fontBold, detail, 11, 7.5, detailMax);
+  drawText(ctx, detail, {
+    x: MARGIN + padX,
+    y: topY - 27,
+    size: detailSize,
+    bold: true,
+    color: TEXT,
+    maxWidth: detailMax,
+  });
+  drawText(ctx, totalText, {
+    x: PAGE_W - MARGIN - padX - totalW,
+    y: topY - 22,
+    size: totalSize,
+    bold: true,
+    color: DUCK,
+  });
+}
+
 // ─── VISUELS : N vues côte à côte, t-shirts à la MÊME hauteur ────────────
 interface OptimizedView {
   view: BatPdfView;
@@ -414,6 +484,22 @@ function drawVisuals(ctx: Ctx, views: OptimizedView[], topY: number, bottomY: nu
       color: WHITE,
       tracking: 1.5,
     });
+
+    // Légende « taille du marquage » centrée dans le bas du cadre (sous l'image).
+    const mark = view.markSize?.trim();
+    if (mark) {
+      const cap = `Marquage · ${mark}`;
+      const capSize = 6.5;
+      const capMax = fw - 12;
+      const capW = Math.min(widthOf(ctx.font, cap, capSize), capMax);
+      drawText(ctx, cap, {
+        x: slotX + (fw - capW) / 2,
+        y: slotBottom + 4.5,
+        size: capSize,
+        color: MUTED,
+        maxWidth: capMax,
+      });
+    }
 
     cursorX += fw + colGap;
   });
@@ -548,11 +634,18 @@ export async function buildBatPdf(input: BatPdfInput): Promise<Blob> {
   const headerBottom = PAGE_H - MARGIN - HEADER_H;
   const specsTop = headerBottom - GAP;
   const specsBottom = specsTop - SPECS_H;
-  const visualsTop = specsBottom - GAP;
+
+  // Bandeau quantités optionnel : ne s'affiche (et ne mange de la hauteur des
+  // visuels) que si des tailles sont commandées.
+  const orderSizes = input.orderSizes ?? [];
+  const hasOrder = orderSizes.length > 0;
+  const orderTop = specsBottom - GAP;
+  const visualsTop = (hasOrder ? orderTop - ORDER_H : specsBottom) - GAP;
   const visualsBottom = BAND_BOTTOM + BAND_H + GAP;
 
   drawHeader(ctx, input, logoImg, bat);
   drawSpecs(ctx, input, specsTop);
+  if (hasOrder) drawOrderStrip(ctx, orderSizes, orderTop);
   drawVisuals(ctx, optimized, visualsTop, visualsBottom);
   drawMentions(ctx);
   drawFooter(ctx, input, bat);

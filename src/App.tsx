@@ -6,6 +6,8 @@ import { composeFacePng } from "./compose";
 import { buildBatPdf, formatBatFilename } from "./pdf/buildPdf";
 import { resolveSide } from "./sideView";
 import { recolorSide } from "./sideRecolor";
+import { OrderSizesEditor } from "./OrderSizesEditor";
+import { activeOrderSizes, defaultOrderSizes, type OrderSize } from "./orderSizes";
 import {
   defaultFaceState,
   SIDE_VISIBLE_FRACTION,
@@ -36,6 +38,12 @@ export default function App() {
   const [selectedColorSlug, setSelectedColorSlug] = useState<string>("");
   const [front, setFront] = useState<FaceState>(() => defaultFaceState("front"));
   const [back, setBack] = useState<FaceState>(() => defaultFaceState("back"));
+  // Inclusion de chaque face principale dans le BAT (permet de ne garder que
+  // l'avant OU l'arrière). Les deux incluses par défaut.
+  const [frontIncluded, setFrontIncluded] = useState(true);
+  const [backIncluded, setBackIncluded] = useState(true);
+  // Tailles & quantités de la commande client (ex. 15 S · 2 M).
+  const [orderSizes, setOrderSizes] = useState<OrderSize[]>(() => defaultOrderSizes());
   // Vues de côté optionnelles : gauche (image d'origine) + droite (miroir).
   const [sideLeft, setSideLeft] = useState<FaceState>(() => defaultFaceState("sideLeft"));
   const [sideRight, setSideRight] = useState<FaceState>(() => defaultFaceState("sideRight"));
@@ -108,6 +116,17 @@ export default function App() {
     }
   }, [selectedRef, selectedColorSlug]);
 
+  // Nouvelle référence = nouveau vêtement/nouveau job : on réinclut les deux
+  // faces et on efface la taille de marquage (les dimensions décrivaient le
+  // marquage de l'article précédent). Le changement de couleur, lui, conserve
+  // tout (même article). Les tailles de commande restent (souvent ré-utilisées).
+  useEffect(() => {
+    setFrontIncluded(true);
+    setBackIncluded(true);
+    setFront((p) => (p.markSize ? { ...p, markSize: "" } : p));
+    setBack((p) => (p.markSize ? { ...p, markSize: "" } : p));
+  }, [selectedRefId]);
+
   const frontUrl = selectedColor?.front ?? null;
   const backUrl = selectedColor?.back ?? null;
 
@@ -166,13 +185,28 @@ export default function App() {
     toastTimer.current = window.setTimeout(() => setToast(null), 3500);
   }
 
+  // Inclure/exclure une face, en garantissant qu'il reste TOUJOURS au moins une
+  // face avec un visuel dans le BAT (sinon le bouton se grise « pour rien »).
+  function toggleFaceIncluded(face: "front" | "back", next: boolean) {
+    if (!next) {
+      const otherIncluded = face === "front" ? backIncluded : frontIncluded;
+      const otherHasMockup = face === "front" ? backUrl !== null : frontUrl !== null;
+      if (!(otherIncluded && otherHasMockup)) {
+        showToast("Garde au moins une face avec un visuel dans le BAT", "info");
+        return;
+      }
+    }
+    if (face === "front") setFrontIncluded(next);
+    else setBackIncluded(next);
+  }
+
   // ─── Génération PDF ───────────────────────────────────────────────────
   const canGenerate =
     clientName.trim().length > 0 &&
     selectedRef !== null &&
     selectedColor !== null &&
-    (front.logo !== null ||
-      back.logo !== null ||
+    ((frontIncluded && front.logo !== null) ||
+      (backIncluded && back.logo !== null) ||
       (showSides && (sideLeft.logo !== null || sideRight.logo !== null)));
 
   async function handleGenerate() {
@@ -183,14 +217,17 @@ export default function App() {
         label: string;
         composedPng: Blob;
         cropXFraction?: number;
+        markSize?: string;
       }> = [];
-      if (frontUrl) {
+      if (frontUrl && frontIncluded) {
         const png = await composeFacePng(frontUrl, front);
-        views.push({ label: "Avant", composedPng: png });
+        // La taille du marquage ne décrit un marquage que s'il y a un logo :
+        // pas de légende « Marquage · … » sous un t-shirt nu.
+        views.push({ label: "Avant", composedPng: png, markSize: front.logo ? front.markSize : undefined });
       }
-      if (backUrl) {
+      if (backUrl && backIncluded) {
         const png = await composeFacePng(backUrl, back);
-        views.push({ label: "Arrière", composedPng: png });
+        views.push({ label: "Arrière", composedPng: png, markSize: back.logo ? back.markSize : undefined });
       }
       if (showSides && sideMockupUrl) {
         // Gauche = miroir, droite = image d'origine. Slots étroits + rognés.
@@ -219,6 +256,7 @@ export default function App() {
         colorLabel: selectedColor.label,
         colorHex: selectedColor.hex,
         views,
+        orderSizes: activeOrderSizes(orderSizes),
       };
       const blob = await buildBatPdf(input);
       const url = URL.createObjectURL(blob);
@@ -361,6 +399,11 @@ export default function App() {
             </label>
           </div>
         )}
+
+        {/* Tailles & quantités de la commande client (15 S · 2 M…) */}
+        <div className="mx-auto max-w-[1400px] px-6 pb-4">
+          <OrderSizesEditor sizes={orderSizes} onChange={setOrderSizes} />
+        </div>
       </section>
 
       {/* ─── Canvas avant / arrière / côtés ─────────────────────────────
@@ -383,6 +426,9 @@ export default function App() {
           onChange={setFront}
           onError={(m) => showToast(m, "error")}
           fitHeight={!showSides}
+          showMarkSize
+          included={frontIncluded}
+          onToggleIncluded={(next) => toggleFaceIncluded("front", next)}
         />
         <CanvasStage
           face="back"
@@ -392,6 +438,9 @@ export default function App() {
           onChange={setBack}
           onError={(m) => showToast(m, "error")}
           fitHeight={!showSides}
+          showMarkSize
+          included={backIncluded}
+          onToggleIncluded={(next) => toggleFaceIncluded("back", next)}
         />
         {showSides && (
           <>
