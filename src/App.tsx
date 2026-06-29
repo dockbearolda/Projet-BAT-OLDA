@@ -27,6 +27,7 @@ const CATEGORY_LABELS: Record<string, string> = {
   ENFANT: "Enfant",
   BEBE: "Bébé",
   POCHETTE: "Pochette",
+  AUTRE: "Autre",
 };
 
 export default function App() {

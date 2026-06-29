@@ -182,7 +182,7 @@ function parseCsvLine(line) {
 }
 
 // ─── Ordre d'affichage des catégories : Homme → Femme → Enfant → Bébé → Pochette ──
-const CATEGORY_ORDER = ["HOMME", "FEMME", "ENFANT", "BEBE", "POCHETTE"];
+const CATEGORY_ORDER = ["HOMME", "FEMME", "ENFANT", "BEBE", "POCHETTE", "AUTRE"];
 function categoryRank(category) {
   const i = CATEGORY_ORDER.indexOf((category ?? "").toUpperCase());
   return i === -1 ? CATEGORY_ORDER.length : i; // catégories inconnues en dernier
