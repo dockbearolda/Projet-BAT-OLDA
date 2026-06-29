@@ -75,6 +75,7 @@ const COLOR_META = {
   blue_sapphire:       { label: "Bleu Saphir",        hex: "#0F52BA" },
   ivory:               { label: "Ivoire",             hex: "#F5F0E6" },
   petal_rose:          { label: "Rose Pétale",        hex: "#E8C4C9" },
+  natural:             { label: "Naturel",            hex: "#E3D5B8" },
   // ─── Pochette KI3210 — gamme "Washed" (hex affinés par échantillonnage) ──
   washed_natural:      { label: "Naturel Délavé",     hex: "#E5DCC5" },
   washed_pearl_blue:   { label: "Bleu Perle Délavé",  hex: "#B8C9CE" },
@@ -103,6 +104,8 @@ const SLEEVE_TYPE = {
   // Pochette : pas de manche ni de côté → "none" (aucun gabarit) → vue côté
   // indisponible, on n'emprunte jamais un côté de t-shirt.
   "P-001_KI3210": "none",
+  // Tote bag : pas de manche ni de côté → "none" (vue côté indisponible).
+  "A-002": "none",
 };
 function sleeveTypeOf(refId) {
   return SLEEVE_TYPE[refId] ?? "short";
