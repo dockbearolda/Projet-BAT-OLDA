@@ -25,7 +25,21 @@ const MIN_LOGO_WIDTH_PCT = 5;
 const MAX_LOGO_WIDTH_PCT = 80;
 const LOGO_ACCEPT = "image/png,image/jpeg,image/svg+xml,application/pdf";
 
+// Cache d'images borné (LRU simple) : chaque logo/tint produit une data-URL
+// volumineuse ; sans borne, une longue session (beaucoup de clients + essais
+// de couleurs) ferait grimper la mémoire indéfiniment.
+const IMAGE_CACHE_MAX = 48;
 const imageCache = new Map<string, HTMLImageElement>();
+
+function cacheImage(src: string, image: HTMLImageElement): void {
+  imageCache.delete(src); // ré-insère en fin → ordre LRU
+  imageCache.set(src, image);
+  while (imageCache.size > IMAGE_CACHE_MAX) {
+    const oldest = imageCache.keys().next().value;
+    if (oldest === undefined) break;
+    imageCache.delete(oldest);
+  }
+}
 
 function useCachedImage(src: string | null): HTMLImageElement | null {
   const [img, setImg] = useState<HTMLImageElement | null>(() => {
@@ -49,7 +63,7 @@ function useCachedImage(src: string | null): HTMLImageElement | null {
     image.crossOrigin = "anonymous";
     image.onload = () => {
       if (cancelled) return;
-      imageCache.set(src, image);
+      cacheImage(src, image);
       setImg(image);
     };
     image.onerror = () => {
@@ -167,6 +181,11 @@ export function CanvasStage({
   const [hasCustomDefault, setHasCustomDefault] = useState(() => loadDefaultOverride(face) !== null);
   const [savedFlash, setSavedFlash] = useState(false);
   const flashTimer = useRef<number | null>(null);
+  // Jeton monotone : le sélecteur de couleur personnalisé (<input type=color>)
+  // émet onChange en continu pendant le drag ; chaque appel lance un tint async
+  // qui peut résoudre dans le désordre. On n'applique que le résultat du DERNIER
+  // hex demandé, pas du dernier résolu.
+  const tintReq = useRef(0);
 
   useEffect(() => {
     setHasCustomDefault(loadDefaultOverride(face) !== null);
@@ -299,16 +318,18 @@ export function CanvasStage({
 
   async function applyTint(hex: string | null) {
     if (!state.logo) return;
+    const req = ++tintReq.current;
     if (hex === null) {
       onChange((prev) => ({ ...prev, logoTint: null, logoTintedUrl: null }));
       return;
     }
     try {
       const url = await tintLogo(state.logo.dataUrl, hex);
+      if (req !== tintReq.current) return; // un tint plus récent a été demandé
       // updater fonctionnel : un drag/resize pendant le calcul du tint n'est pas perdu
       onChange((prev) => ({ ...prev, logoTint: hex, logoTintedUrl: url }));
     } catch {
-      onError?.("Recoloration impossible");
+      if (req === tintReq.current) onError?.("Recoloration impossible");
     }
   }
 
@@ -340,12 +361,19 @@ export function CanvasStage({
             type="button"
             onClick={() => applyTint(hex)}
             title={name}
-            className={`flex h-6 w-6 min-h-0 flex-shrink-0 items-center justify-center rounded-full transition hover:scale-110 ${
-              isLight(hex) ? "border border-duck/25" : ""
-            } ${sel ? "ring-2 ring-duck-focus ring-offset-1" : ""}`}
-            style={{ backgroundColor: hex }}
+            aria-label={`Recolorer le logo en ${name}`}
+            // Sur écran tactile (tablette) la zone de tap passe à 44px ; la
+            // pastille visuelle reste à 24px et le desktop garde sa densité.
+            className="flex h-6 w-6 min-h-0 flex-shrink-0 items-center justify-center rounded-full transition hover:scale-110 [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11"
           >
-            {sel && <Check className={`h-3 w-3 ${isLight(hex) ? "text-ink" : "text-white"}`} />}
+            <span
+              className={`flex h-6 w-6 items-center justify-center rounded-full ${
+                isLight(hex) ? "border border-duck/25" : ""
+              } ${sel ? "ring-2 ring-duck-focus ring-offset-1" : ""}`}
+              style={{ backgroundColor: hex }}
+            >
+              {sel && <Check className={`h-3 w-3 ${isLight(hex) ? "text-ink" : "text-white"}`} />}
+            </span>
           </button>
         );
       })}
@@ -353,7 +381,7 @@ export function CanvasStage({
         type="button"
         onClick={() => applyTint(null)}
         title="Couleur d'origine du logo"
-        className={`ml-0.5 flex-shrink-0 rounded px-1.5 py-0.5 text-[10px] font-medium ${
+        className={`ml-0.5 flex min-h-0 flex-shrink-0 items-center rounded px-1.5 py-0.5 text-[10px] font-medium [@media(pointer:coarse)]:min-h-[44px] ${
           state.logoTint === null ? "bg-duck/10 text-ink" : "text-muted2 hover:text-ink"
         }`}
       >
@@ -364,7 +392,8 @@ export function CanvasStage({
         value={state.logoTint ?? "#000000"}
         onChange={(e) => applyTint(e.target.value.toUpperCase())}
         title="Couleur personnalisée"
-        className="h-6 w-6 min-h-0 flex-shrink-0 cursor-pointer rounded border border-duck/15 bg-white"
+        aria-label="Couleur personnalisée du logo"
+        className="h-6 w-6 min-h-0 flex-shrink-0 cursor-pointer rounded border border-duck/15 bg-white [@media(pointer:coarse)]:h-11 [@media(pointer:coarse)]:w-11 [@media(pointer:coarse)]:p-0.5"
       />
     </div>
   );

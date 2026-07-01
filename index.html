@@ -5,6 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
     <meta name="theme-color" content="#EBEAE8" />
     <title>Atelier OLDA — Générateur de BAT</title>
+    <!-- Le catalogue est fetché au montage React ; on le précharge en parallèle
+         du JS pour retirer un aller-retour du chemin critique (LCP). -->
+    <link rel="preload" href="/manifest.json" as="fetch" crossorigin="anonymous" />
   </head>
   <body class="text-ink antialiased">
     <div id="root"></div>
