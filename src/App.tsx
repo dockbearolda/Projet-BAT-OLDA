@@ -4,6 +4,7 @@ import { CanvasStage } from "./canvas/CanvasStage";
 import oldaLogoGlass from "./assets/olda-logo-glass.svg";
 import { composeFacePng } from "./compose";
 import { buildBatPdf, formatBatFilename } from "./pdf/buildPdf";
+import { saveBlobAs } from "./saveFile";
 import { resolveSide } from "./sideView";
 import { recolorSide } from "./sideRecolor";
 import { OrderSizesEditor } from "./OrderSizesEditor";
@@ -254,15 +255,14 @@ export default function App() {
         orderSizes: activeOrderSizes(orderSizes),
       };
       const blob = await buildBatPdf(input);
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = formatBatFilename(input);
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      setTimeout(() => URL.revokeObjectURL(url), 1000);
-      showToast("PDF généré et téléchargé", "success");
+      const outcome = await saveBlobAs(blob, formatBatFilename(input));
+      if (outcome === "saved") {
+        showToast("BAT enregistré", "success");
+      } else if (outcome === "downloaded") {
+        showToast("BAT téléchargé", "success");
+      } else {
+        showToast("Enregistrement annulé", "info");
+      }
     } catch (err) {
       showToast(err instanceof Error ? err.message : "Échec génération PDF", "error");
     } finally {
