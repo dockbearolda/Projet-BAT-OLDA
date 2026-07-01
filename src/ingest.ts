@@ -2,6 +2,19 @@ import { pdfFirstPageToDataURL } from "./pdfWorker";
 import type { LogoAsset } from "./types";
 
 export const MAX_FILE_SIZE = 20 * 1024 * 1024;
+// Un fichier léger peut décoder en une image énorme (SVG width="30000",
+// PNG très compressé). On borne la surface décodée pour ne pas saturer la
+// mémoire de la tablette au moment de composer/rasteriser.
+export const MAX_DECODED_MEGAPIXELS = 40;
+
+function assertDecodedSize(width: number, height: number): void {
+  if (!Number.isFinite(width) || !Number.isFinite(height) || width <= 0 || height <= 0) {
+    throw new IngestError("Image aux dimensions invalides");
+  }
+  if ((width * height) / 1_000_000 > MAX_DECODED_MEGAPIXELS) {
+    throw new IngestError(`Image trop grande (max ${MAX_DECODED_MEGAPIXELS} Mpx)`);
+  }
+}
 
 export class IngestError extends Error {
   constructor(message: string) {
@@ -173,6 +186,7 @@ export async function ingestLogo(file: File): Promise<LogoAsset> {
   if (isPdf(file)) {
     const dataUrl = await pdfFirstPageToDataURL(file, 2000);
     const dims = await loadImageDims(dataUrl);
+    assertDecodedSize(dims.width, dims.height);
     return {
       dataUrl,
       mime: "image/png",
@@ -185,6 +199,7 @@ export async function ingestLogo(file: File): Promise<LogoAsset> {
 
   if (isSvg(file)) {
     const { dataUrl, width, height } = await svgToDataUrl(file);
+    assertDecodedSize(width, height);
     return {
       dataUrl,
       mime: "image/svg+xml",
@@ -198,6 +213,7 @@ export async function ingestLogo(file: File): Promise<LogoAsset> {
   if (file.type.startsWith("image/")) {
     const dataUrl = await fileToDataURL(file);
     const dims = await loadImageDims(dataUrl);
+    assertDecodedSize(dims.width, dims.height);
     return {
       dataUrl,
       mime: file.type,

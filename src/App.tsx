@@ -3,7 +3,6 @@ import { Check, ChevronDown, Download, Loader2 } from "lucide-react";
 import { CanvasStage } from "./canvas/CanvasStage";
 import oldaLogoGlass from "./assets/olda-logo-glass.svg";
 import { composeFacePng } from "./compose";
-import { buildBatPdf, formatBatFilename } from "./pdf/buildPdf";
 import { saveBlobAs } from "./saveFile";
 import { resolveSide } from "./sideView";
 import { recolorSide } from "./sideRecolor";
@@ -254,6 +253,9 @@ export default function App() {
         views,
         orderSizes: activeOrderSizes(orderSizes),
       };
+      // Import dynamique : pdf-lib + fontkit (~lourd) ne sont chargés qu'au
+      // moment de générer, jamais au 1er rendu → LCP initial allégé.
+      const { buildBatPdf, formatBatFilename } = await import("./pdf/buildPdf");
       const blob = await buildBatPdf(input);
       const outcome = await saveBlobAs(blob, formatBatFilename(input));
       if (outcome === "saved") {
@@ -317,7 +319,7 @@ export default function App() {
             type="button"
             onClick={handleGenerate}
             disabled={!canGenerate || generating}
-            className="inline-flex items-center gap-2 rounded-xl bg-duck px-5 py-2.5 text-sm font-semibold text-white shadow-olda transition active:enabled:scale-[0.97] disabled:cursor-not-allowed disabled:bg-sage/70 disabled:text-white/90 disabled:shadow-none hover:enabled:bg-duck-hover"
+            className="inline-flex min-h-[44px] items-center gap-2 rounded-xl bg-duck px-5 py-2.5 text-sm font-semibold text-white shadow-olda transition active:enabled:scale-[0.97] disabled:cursor-not-allowed disabled:bg-sage/70 disabled:text-white/90 disabled:shadow-none hover:enabled:bg-duck-hover"
           >
             {generating ? (
               <Loader2 className="h-4 w-4 animate-spin" />
@@ -343,6 +345,7 @@ export default function App() {
               type="text"
               value={clientName}
               onChange={(e) => setClientName(e.target.value)}
+              maxLength={120}
               placeholder="ex. Dupont SARL"
               className="w-full rounded-lg border border-duck/15 bg-white px-3 py-2 text-sm placeholder:text-muted2/70 focus:border-duck-focus focus:outline-none focus:ring-1 focus:ring-duck-focus"
             />
@@ -376,7 +379,7 @@ export default function App() {
         {selectedRef && selectedRef.sleeveType !== "none" && (
           <div className="mx-auto max-w-[1400px] px-6 pb-4">
             <label
-              className={`inline-flex items-center gap-2.5 text-sm ${
+              className={`inline-flex min-h-[44px] items-center gap-2.5 text-sm ${
                 sideAvailable ? "cursor-pointer text-muted" : "cursor-not-allowed text-muted2"
               }`}
             >
@@ -385,7 +388,7 @@ export default function App() {
                 checked={sidesEnabled && sideAvailable}
                 disabled={!sideAvailable}
                 onChange={(e) => setSidesEnabled(e.target.checked)}
-                className="h-4 w-4 rounded border-duck/30 text-duck focus:ring-1 focus:ring-duck-focus disabled:opacity-50"
+                className="h-5 w-5 rounded border-duck/30 text-duck focus:ring-1 focus:ring-duck-focus disabled:opacity-50"
               />
               <span>Ajouter les vues de côté (manches gauche + droite)</span>
               {!sideAvailable && (
