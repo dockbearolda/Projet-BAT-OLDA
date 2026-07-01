@@ -8,10 +8,18 @@ import {
   type OrderSize,
 } from "./orderSizes";
 
+/** Entier ≥ 0 borné à partir des chiffres de tête uniquement. Rejette proprement
+ *  hexa (0x10), notation scientifique (1e3) et décimales, sans surprise. */
+function clampInt(raw: string, max = 99999): number {
+  const m = raw.trim().match(/^\d+/);
+  if (!m) return 0;
+  return Math.min(max, parseInt(m[0], 10));
+}
+
 /** Champ mm → entier ≥ 0 borné, ou null si vide. */
 function parseMm(raw: string): number | null {
   if (raw.trim() === "") return null;
-  return Math.max(0, Math.min(99999, Math.floor(Number(raw) || 0)));
+  return clampInt(raw);
 }
 
 // ─── Éditeur « Tailles & quantités de la commande » ─────────────────────
@@ -55,7 +63,7 @@ export function OrderSizesEditor({
   }, [open]);
 
   function setQty(id: string, raw: string) {
-    const n = Math.max(0, Math.min(99999, Math.floor(Number(raw) || 0)));
+    const n = clampInt(raw);
     onChange(sizes.map((s) => (s.id === id ? { ...s, qty: n } : s)));
   }
   function setLabel(id: string, label: string) {

@@ -59,6 +59,8 @@ export interface LogoAsset {
   /** Vrai si le logo est une silhouette monochrome (fond transparent + 1 couleur)
    *  → recoloration possible directement dans l'app. */
   isMonochrome: boolean;
+  /** Avertissement non bloquant à afficher après ingestion (ex. PDF multi-pages). */
+  warning?: string;
 }
 
 export interface FaceState {

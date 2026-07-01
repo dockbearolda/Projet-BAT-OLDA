@@ -423,6 +423,7 @@ export default function App() {
           state={front}
           onChange={setFront}
           onError={(m) => showToast(m, "error")}
+          onNotice={(m) => showToast(m, "info")}
           fitHeight={!showSides}
           included={frontIncluded}
           onToggleIncluded={(next) => toggleFaceIncluded("front", next)}
@@ -434,6 +435,7 @@ export default function App() {
           state={back}
           onChange={setBack}
           onError={(m) => showToast(m, "error")}
+          onNotice={(m) => showToast(m, "info")}
           fitHeight={!showSides}
           included={backIncluded}
           onToggleIncluded={(next) => toggleFaceIncluded("back", next)}
@@ -447,6 +449,7 @@ export default function App() {
               state={sideLeft}
               onChange={setSideLeft}
               onError={(m) => showToast(m, "error")}
+              onNotice={(m) => showToast(m, "info")}
               cover
               mirror
             />
@@ -457,6 +460,7 @@ export default function App() {
               state={sideRight}
               onChange={setSideRight}
               onError={(m) => showToast(m, "error")}
+              onNotice={(m) => showToast(m, "info")}
               cover
             />
           </>
