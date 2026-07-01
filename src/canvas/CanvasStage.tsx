@@ -106,6 +106,8 @@ export interface CanvasStageProps {
   state: FaceState;
   onChange: (next: FaceState | ((prev: FaceState) => FaceState)) => void;
   onError?: (msg: string) => void;
+  /** Avertissement non bloquant (ex. PDF multi-pages) → toast info. */
+  onNotice?: (msg: string) => void;
   /** Rognage par la hauteur : le mockup remplit la hauteur de la bulle et son
    *  blanc latéral déborde (clippé). Pour les profils étroits (vues de côté). */
   cover?: boolean;
@@ -126,6 +128,7 @@ export function CanvasStage({
   state,
   onChange,
   onError,
+  onNotice,
   cover = false,
   mirror = false,
   fitHeight = false,
@@ -310,6 +313,7 @@ export function CanvasStage({
       const asset = await ingestLogo(f);
       // updater fonctionnel : ne pas écraser une position/taille modifiée pendant l'await
       onChange((prev) => ({ ...prev, logo: asset, logoTint: null, logoTintedUrl: null }));
+      if (asset.warning) onNotice?.(asset.warning);
     } catch (err) {
       const msg = err instanceof IngestError ? err.message : "Logo illisible";
       onError?.(msg);

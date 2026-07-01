@@ -184,7 +184,21 @@ export async function ingestLogo(file: File): Promise<LogoAsset> {
   }
 
   if (isPdf(file)) {
-    const dataUrl = await pdfFirstPageToDataURL(file, 2000);
+    let dataUrl: string;
+    let numPages: number;
+    try {
+      ({ dataUrl, numPages } = await pdfFirstPageToDataURL(file, 2000));
+    } catch (err) {
+      // pdf.js renvoie des exceptions typées → messages parlants.
+      const name = err instanceof Error ? err.name : "";
+      if (name === "PasswordException") {
+        throw new IngestError("PDF protégé par mot de passe");
+      }
+      if (name === "InvalidPDFException" || file.size === 0) {
+        throw new IngestError("PDF illisible ou corrompu");
+      }
+      throw new IngestError("Impossible de lire ce PDF");
+    }
     const dims = await loadImageDims(dataUrl);
     assertDecodedSize(dims.width, dims.height);
     return {
@@ -194,6 +208,10 @@ export async function ingestLogo(file: File): Promise<LogoAsset> {
       naturalWidth: dims.width,
       naturalHeight: dims.height,
       isMonochrome: await analyzeMonochrome(dataUrl),
+      warning:
+        numPages > 1
+          ? `PDF multi-pages : seule la 1ʳᵉ page est utilisée (${numPages} pages)`
+          : undefined,
     };
   }
 
